@@ -1,6 +1,6 @@
 import socket
 import json
-import threading
+import _thread
 
 
 class HttpServer:
@@ -185,12 +185,10 @@ class HttpServer:
             while self.running:
                 connection, address = server_socket.accept()
                 # Handle each connection in a separate thread
-                thread = threading.Thread(
-                    target=self._handle_client,
-                    args=(connection, address),
-                    daemon=True
+                _thread.start_new_thread(
+                    self._handle_client,
+                    (connection, address)
                 )
-                thread.start()
         except KeyboardInterrupt:
             print("Servidor interrompido")
         finally:
