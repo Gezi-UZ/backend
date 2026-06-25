@@ -1,4 +1,4 @@
-# Gezi - IoT LED and Clock Control System
+# Gezi - IoT
 
 A MicroPython-based IoT project for ESP32 that provides remote LED control and digital clock display via HTTP API and Flutter mobile app.
 
