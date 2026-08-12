@@ -24,7 +24,7 @@ app/
 
 **Base URL:** `https://api.gezi.mz/v1` _(Railway — produção sandbox)_
 
-**Autenticação:** Bearer Token (JWT) em todos os endpoints excepto `/auth/*` e callbacks de pagamento.
+**Autenticação e Base de Dados:** Bearer Token (JWT) validado pelo FastAPI, gerado directamente via **Supabase Auth** no mobile (para reduzir latência). A persistência de alta performance é garantida por **SQLAlchemy + Alembic** apontando para o PostgreSQL do Supabase, enquanto a sincronização em tempo real flui via **Supabase Realtime** através de WebSockets.
 
 ```http
 Authorization: Bearer <jwt_token>
@@ -43,141 +43,12 @@ Authorization: Bearer <jwt_token>
 
 ---
 
-## 2. Módulo `auth` — Autenticação
+## 2. Módulo `auth` — Autenticação (Delegada)
 
 _Cobre: RF02, RN04_
 
-### `POST /auth/otp/request`
-
-Solicita o envio de um código OTP por SMS para o número de telemóvel indicado.
-
-**Request Body**
-
-```json
-{
-  "phone_number": "+258841234567"
-}
-```
-
-**Response `200 OK`**
-
-```json
-{
-  "success": true,
-  "data": {
-    "otp_sent": true,
-    "expires_in_seconds": 300
-  }
-}
-```
-
-**Erros**
-
-|Código|Descrição|
-|---|---|
-|`400`|Número de telemóvel inválido|
-|`429`|Demasiados pedidos OTP — _rate limit_|
-
----
-
-### `POST /auth/otp/verify`
-
-Valida o código OTP recebido e devolve o JWT de sessão.
-
-**Request Body**
-
-```json
-{
-  "phone_number": "+258841234567",
-  "otp_code": "482917"
-}
-```
-
-**Response `200 OK`**
-
-```json
-{
-  "success": true,
-  "data": {
-    "access_token": "eyJhbGciOiJI...",
-    "token_type": "bearer",
-    "expires_in": 3600,
-    "user_id": "usr_8f3a2b",
-    "is_new_user": false
-  }
-}
-```
-
-**Erros**
-
-|Código|Descrição|
-|---|---|
-|`401`|Código OTP inválido ou expirado|
-|`404`|Número não registado _(se `is_new_user` exigir registo prévio)_|
-
----
-
-### `POST /auth/biometric/verify`
-
-_(Opcional, complementar ao OTP — RF02)_ Confirma uma operação sensível via biometria local validada no dispositivo.
-
-**Request Body**
-
-```json
-{
-  "user_id": "usr_8f3a2b",
-  "biometric_token": "device_signed_token",
-  "action": "RECHARGE_CONFIRM"
-}
-```
-
-**Response `200 OK`**
-
-```json
-{
-  "success": true,
-  "data": { "verified": true }
-}
-```
-
----
-
-### `POST /auth/refresh`
-
-Renova a sessão JWT antes de expirar.
-
-**Request Body**
-
-```json
-{ "refresh_token": "eyJhbGciOiJI..." }
-```
-
-**Response `200 OK`**
-
-```json
-{
-  "success": true,
-  "data": { "access_token": "eyJhbGciOiJI...", "expires_in": 3600 }
-}
-```
-
-**Erros**
-
-|Código|Descrição|
-|---|---|
-|`401`|Sessão expirada — _exige nova autenticação OTP (RN04)_|
-
----
-
-### `POST /auth/logout`
-
-Invalida a sessão activa.
-
-**Response `200 OK`**
-
-```json
-{ "success": true, "data": { "logged_out": true } }
-```
+> [!NOTE]
+> Conforme a Arquitectura definida, para garantir a mínima latência, o fluxo de autenticação (OTP SMS / Biometria) **não passa pelo FastAPI**. A aplicação móvel comunica directamente com o **Supabase Auth** para realizar o login e obter o Token JWT. O backend limita-se a validar o token recebido no cabeçalho `Authorization`.
 
 ---
 
@@ -290,7 +161,10 @@ Edita metadados do contador (label, localização).
 
 ### `GET /meters/{meter_id}/status`
 
-Estado em tempo real do contador _(RF08 — complementar ao Supabase Realtime para consultas pontuais/polling de fallback)_.
+Estado actual do contador _(RF08)_.
+
+> [!TIP]
+> Em operação normal, a aplicação móvel comunica directamente com o **Supabase Realtime** via WebSockets para receber o estado e o saldo em tempo real, sem passar pelo FastAPI. Esta rota serve apenas para fallback/polling.
 
 **Response `200 OK`**
 
@@ -838,11 +712,6 @@ Devolve metadados e URL de acesso ao documento.
 
 | Método | Rota                           | Módulo    | RF/RN      | Auth  |
 | ------ | ------------------------------ | --------- | ---------- | ----- |
-| POST   | `/auth/otp/request`            | auth      | RF02       | Não   |
-| POST   | `/auth/otp/verify`             | auth      | RF02       | Não   |
-| POST   | `/auth/biometric/verify`       | auth      | RF02       | Sim   |
-| POST   | `/auth/refresh`                | auth      | RN04       | Sim   |
-| POST   | `/auth/logout`                 | auth      | RN04       | Sim   |
 | GET    | `/meters/me`                   | meter     | RF01, RN09 | Sim   |
 | POST   | `/meters`                      | meter     | RF01       | Sim   |
 | GET    | `/meters/{id}`                 | meter     | RF01, RN09 | Sim   |
@@ -884,6 +753,5 @@ Devolve metadados e URL de acesso ao documento.
 
 - **TLS 1.3** obrigatório em todas as ligações HTTPS e MQTT (RNF01)
 - **HMAC-SHA256** assina todos os comandos MQTT críticos, validado pelo firmware antes de aplicar qualquer crédito
-- **Rate limiting** em `/auth/otp/request` para mitigar abuso de SMS
 - **Idempotência** obrigatória em `/payments/callback` (chave: `reference`) para evitar duplicação de créditos em caso de reenvio do webhook
 - **RLS (Row Level Security)** no Supabase garante RN09 a nível de base de dados, não apenas a nível de aplicação
