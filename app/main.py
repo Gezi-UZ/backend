@@ -5,7 +5,7 @@ import logging
 
 from app.core.config import settings
 from app.core.mqtt import start_mqtt, stop_mqtt
-from app.api.v1.router import api_router
+from app.core.router import api_router
 
 logging.basicConfig(level=logging.INFO)
 
