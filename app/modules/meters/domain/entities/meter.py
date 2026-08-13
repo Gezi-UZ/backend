@@ -12,13 +12,20 @@ class Contador(Base, TimestampMixin):
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     numero_serie: Mapped[str] = mapped_column(String, unique=True, index=True)
-    estado: Mapped[str] = mapped_column(String, default="INACTIVE")
+    label: Mapped[str] = mapped_column(String, nullable=True)
+    latitude: Mapped[float] = mapped_column(Double, nullable=True)
+    longitude: Mapped[float] = mapped_column(Double, nullable=True)
+    address: Mapped[str] = mapped_column(String, nullable=True)
+    
+    estado: Mapped[str] = mapped_column(String, default="INACTIVE") # e.g. PENDING_ACTIVATION, ONLINE
     is_online: Mapped[bool] = mapped_column(Boolean, default=False)
     kwh_saldo: Mapped[float] = mapped_column(Double, default=0.0)
+    estado_rele: Mapped[bool] = mapped_column(Boolean, default=True)
     ultima_sincronizacao: Mapped[datetime] = mapped_column(nullable=True)
+    ultima_recarga: Mapped[datetime] = mapped_column(nullable=True)
     
     # Chaves Estrangeiras
-    utilizador_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("utilizador.id"))
+    utilizador_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("utilizadores.id"))
     # O dispositivo_id ser nullable=True permite ter contadores no sistema antes de instalar o hardware
     dispositivo_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("dispositivo_iot.id"), unique=True, nullable=True)
     

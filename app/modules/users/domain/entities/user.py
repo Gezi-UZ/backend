@@ -1,3 +1,4 @@
+from app.modules.meters.domain.entities.meter import Contador
 import uuid 
 from sqlalchemy import String, Boolean, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -21,9 +22,8 @@ class Utilizador(Base, TimestampMixin):
 
     biometria_activa: Mapped[bool] = mapped_column(Boolean, default=False)
     
-    # Deixo o relacionamento comentado por agora, 
-    # até criarmos o modelo Contador no ficheiro seguinte
-    # contadores: Mapped[list["Contador"]] = relationship(back_populates="utilizador")
+    # Relacionamentos
+    contadores: Mapped[list["Contador"]] = relationship(back_populates="utilizador")
 
     
     
