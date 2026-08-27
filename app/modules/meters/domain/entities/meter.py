@@ -1,11 +1,15 @@
-from app.modules.iot.domain.entities.iot import DispositivoIoT
 import uuid
+from typing import TYPE_CHECKING
 from sqlalchemy import String, Boolean, Double, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime
 
 from app.core.database import Base, TimestampMixin
-from app.modules.users.domain.entities.user import Utilizador
+
+if TYPE_CHECKING:
+    from app.modules.recharges.domain.entities.recharge import Recarga
+    from app.modules.iot.domain.entities.iot import DispositivoIoT
+    from app.modules.users.domain.entities.user import Utilizador
 
 class Contador(Base, TimestampMixin):
     __tablename__ = "contador"
@@ -29,6 +33,7 @@ class Contador(Base, TimestampMixin):
     # O dispositivo_id ser nullable=True permite ter contadores no sistema antes de instalar o hardware
     dispositivo_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("dispositivo_iot.id"), unique=True, nullable=True)
     
-    # Relacionamentos (Lembrar de descomentar em user.py depois)
+    # Relacionamentos
     utilizador: Mapped["Utilizador"] = relationship(back_populates="contadores")
     dispositivo: Mapped["DispositivoIoT"] = relationship(back_populates="contador")
+    recargas: Mapped[list["Recarga"]] = relationship(back_populates="contador")

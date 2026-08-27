@@ -1,9 +1,12 @@
 import uuid
+from typing import TYPE_CHECKING
 from sqlalchemy import Double, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base, TimestampMixin
-from app.modules.recharges.domain.entities.recharge import Recarga
+
+if TYPE_CHECKING:
+    from app.modules.recharges.domain.entities.recharge import Recarga
 
 class DesdobramentoRecarga(Base, TimestampMixin):
     __tablename__ = "desdobramento_recarga"

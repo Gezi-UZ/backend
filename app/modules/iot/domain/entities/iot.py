@@ -1,10 +1,13 @@
-from app.modules.meters.domain.entities.meter import Contador
 import uuid
+from typing import TYPE_CHECKING
 from sqlalchemy import String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime
 
 from app.core.database import Base, TimestampMixin
+
+if TYPE_CHECKING:
+    from app.modules.meters.domain.entities.meter import Contador
 
 
 class DispositivoIoT(Base, TimestampMixin):

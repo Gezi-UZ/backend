@@ -1,11 +1,14 @@
 from datetime import datetime
-from app.modules.users.domain.entities.user import Utilizador
-from app.modules.recharges.domain.entities.recharge import Recarga
 import uuid
+from typing import TYPE_CHECKING
 from sqlalchemy import String, Double, ForeignKey, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base, TimestampMixin
+
+if TYPE_CHECKING:
+    from app.modules.users.domain.entities.user import Utilizador
+    from app.modules.recharges.domain.entities.recharge import Recarga
 
 class Pagamento(Base, TimestampMixin):
     __tablename__ = "pagamento"

@@ -1,0 +1,158 @@
+import uuid
+from typing import List, Optional
+from datetime import datetime
+
+from sqlalchemy.orm import Session
+from sqlalchemy import func
+
+from app.modules.recharges.domain.repositories.recharge_repository import IRechargeRepository
+from app.modules.recharges.domain.entities.recharge import Recarga
+from app.modules.recharges.domain.entities.recharge_breakdown import DesdobramentoRecarga
+from app.modules.recharges.domain.entities.schemas import RechargeInitiateRequest
+from app.modules.meters.domain.entities.meter import Contador
+
+
+class SQLAlchemyRechargeRepository(IRechargeRepository):
+    def __init__(self, db: Session):
+        self.db = db
+
+    def create(self, user_id: uuid.UUID, meter_id: uuid.UUID, data: RechargeInitiateRequest) -> Recarga:
+        db_recharge = Recarga(
+            contador_id=meter_id,
+            montante_pago=data.amount_mzn,
+            estado="PENDING",
+        )
+        self.db.add(db_recharge)
+        self.db.commit()
+        self.db.refresh(db_recharge)
+        return db_recharge
+
+    def create_with_breakdown(
+        self,
+        meter_id: uuid.UUID,
+        montante: float,
+        breakdown_data: dict,
+        metodo: str = "M-PESA",
+        is_primeira_compra: bool = False,
+        token: Optional[str] = None,
+    ) -> Recarga:
+        """Cria recarga + desdobramento numa única transacção."""
+        db_recharge = Recarga(
+            contador_id=meter_id,
+            montante_pago=montante,
+            kwh_creditado=breakdown_data["kwh_calculado"],
+            metodo=metodo,
+            estado="PENDING",
+            is_primeira_compra_mes=is_primeira_compra,
+        )
+        self.db.add(db_recharge)
+        self.db.flush()  # Obtém o ID sem commit para criar o desdobramento
+
+        db_breakdown = DesdobramentoRecarga(
+            recarga_id=db_recharge.id,
+            montante_total=breakdown_data["montante_total"],
+            val_energia=breakdown_data["val_energia"],
+            iva=breakdown_data["iva"],
+            divida_paga=breakdown_data.get("divida_paga", 0.0),
+            tx_radio=breakdown_data["tx_radio"],
+            tx_lixo=breakdown_data["tx_lixo"],
+            kwh_calculado=breakdown_data["kwh_calculado"],
+        )
+        self.db.add(db_breakdown)
+        self.db.commit()
+        self.db.refresh(db_recharge)
+        return db_recharge
+
+    def get_by_id(self, recharge_id: uuid.UUID) -> Optional[Recarga]:
+        return self.db.query(Recarga).filter(Recarga.id == recharge_id).first()
+
+    def get_by_meter_and_code(self, recharge_code: str) -> Optional[Recarga]:
+        """Verifica duplicação de código manual pelo token guardado (RN10)."""
+        return (
+            self.db.query(Recarga)
+            .filter(Recarga.token_sts == recharge_code)
+            .first()
+        )
+
+    def get_history(
+        self,
+        user_id: uuid.UUID,
+        meter_id: Optional[uuid.UUID] = None,
+        from_date: Optional[datetime] = None,
+        to_date: Optional[datetime] = None,
+        skip: int = 0,
+        limit: int = 20,
+    ) -> tuple[List[Recarga], int]:
+        query = (
+            self.db.query(Recarga)
+            .join(Contador, Recarga.contador_id == Contador.id)
+            .filter(Contador.utilizador_id == user_id)
+        )
+        if meter_id:
+            query = query.filter(Recarga.contador_id == meter_id)
+        if from_date:
+            query = query.filter(Recarga.criado_em >= from_date)
+        if to_date:
+            query = query.filter(Recarga.criado_em <= to_date)
+
+        total = query.count()
+        recharges = query.order_by(Recarga.criado_em.desc()).offset(skip).limit(limit).all()
+        return recharges, total
+
+    def update_status(self, recharge_id: uuid.UUID, new_status: str) -> Optional[Recarga]:
+        db_recharge = self.get_by_id(recharge_id)
+        if db_recharge:
+            db_recharge.estado = new_status
+            self.db.commit()
+            self.db.refresh(db_recharge)
+        return db_recharge
+
+    def update_token(self, recharge_id: uuid.UUID, token: str, applied_at: datetime) -> Optional[Recarga]:
+        db_recharge = self.get_by_id(recharge_id)
+        if db_recharge:
+            db_recharge.token_sts = token
+            db_recharge.recarregado_em = applied_at
+            db_recharge.estado = "CONFIRMED"
+            self.db.commit()
+            self.db.refresh(db_recharge)
+        return db_recharge
+
+    def get_dashboard_stats(
+        self,
+        user_id: uuid.UUID,
+        meter_id: Optional[uuid.UUID] = None,
+        from_date: Optional[datetime] = None,
+        to_date: Optional[datetime] = None,
+    ) -> dict:
+        query = (
+            self.db.query(Recarga)
+            .join(Contador, Recarga.contador_id == Contador.id)
+            .filter(Contador.utilizador_id == user_id)
+            .filter(Recarga.estado.in_(["CONFIRMED", "MQTT_SENT", "ACK_RECEIVED", "COMPLETED"]))
+        )
+        if meter_id:
+            query = query.filter(Recarga.contador_id == meter_id)
+        if from_date:
+            query = query.filter(Recarga.criado_em >= from_date)
+        if to_date:
+            query = query.filter(Recarga.criado_em <= to_date)
+
+        recharges = query.all()
+        total_spent = sum(r.montante_pago for r in recharges)
+        total_kwh = sum(r.kwh_creditado or 0.0 for r in recharges)
+        count = len(recharges)
+
+        # Calcular média diária de consumo
+        if from_date and to_date:
+            days = max((to_date - from_date).days, 1)
+        else:
+            days = 30  # Default: último mês
+
+        avg_kwh_day = round(total_kwh / days, 2) if days > 0 else 0.0
+
+        return {
+            "total_spent_mzn": round(total_spent, 2),
+            "total_kwh_purchased": round(total_kwh, 2),
+            "average_consumption_kwh_day": avg_kwh_day,
+            "recharge_count": count,
+        }
