@@ -1,5 +1,5 @@
-import uuid 
-from typing import TYPE_CHECKING
+import uuid
+from typing import TYPE_CHECKING, Optional
 from sqlalchemy import String, Boolean, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -16,10 +16,11 @@ class Utilizador(Base, TimestampMixin):
       ForeignKey("auth.users.id", ondelete="CASCADE"),
       primary_key=True
     )
-    telefone: Mapped[str] = mapped_column(
-      String(9), 
+    telefone: Mapped[Optional[str]] = mapped_column(
+      String(9),
       unique=True,
       index=True,
+      nullable=True,
     )
     nome: Mapped[str] = mapped_column(String)
     papel: Mapped[str] = mapped_column(String, default="cliente")

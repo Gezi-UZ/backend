@@ -10,6 +10,7 @@ if TYPE_CHECKING:
     from app.modules.payments.domain.entities.payment import Pagamento
     from app.modules.recharges.domain.entities.recharge_breakdown import DesdobramentoRecarga
     from app.modules.meters.domain.entities.meter import Contador
+    from app.modules.users.domain.entities.user import Utilizador
 
 class Recarga(Base, TimestampMixin):
     __tablename__ = "recarga"
@@ -32,9 +33,15 @@ class Recarga(Base, TimestampMixin):
 
     # Chave Estrangeira
     contador_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("contador.id"))
+    utilizador_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("utilizadores.id"))
+    pagamento_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("pagamento.id", use_alter=True, name="fk_recarga_pagamento_id"), 
+        nullable=True
+    )
 
     # Relacionamentos
     contador: Mapped["Contador"] = relationship(back_populates="recargas")
+    utilizador: Mapped["Utilizador"] = relationship()
 
     # Relacao 1 para 1 com Desdobramento
     desdobramento: Mapped["DesdobramentoRecarga"] = relationship(
