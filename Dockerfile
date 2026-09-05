@@ -1,4 +1,4 @@
-FROM python:3.11-slim
+FROM python:3.14-slim
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -10,12 +10,10 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 WORKDIR /app
 
-# Copy dependency files
-COPY pyproject.toml ./
-# If using lockfile (uv.lock), copy it as well
-# COPY uv.lock ./
+# Copy dependency files first (cache layer)
+COPY pyproject.toml uv.lock ./
 
-# Install dependencies using uv
+# Install dependencies using uv with lockfile
 RUN uv pip install -r pyproject.toml
 
 # Copy the rest of the application
@@ -25,4 +23,4 @@ COPY . .
 EXPOSE 8000
 
 # Command to run the application
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]

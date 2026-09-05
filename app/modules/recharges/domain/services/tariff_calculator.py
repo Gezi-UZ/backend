@@ -1,25 +1,25 @@
 """
-Lógica de Desdobramento Tarifário CREDELEC (FUNAE/EDM Moçambique)
+Logica de Desdobramento Tarifario CREDELEC (FUNAE/EDM Mocambique)
 
-A tarifa de electricidade em Moçambique segue a estrutura da FUNAE/EDM:
+A tarifa de electricidade em Mocambique segue a estrutura da FUNAE/EDM:
 - IVA: 17%
-- Taxa de Rádio: valor fixo mensal
+- Taxa de Radio: valor fixo mensal
 - Taxa de Lixo: valor fixo mensal
-- Dívida: se existir saldo devedor do utilizador
+- Divida: se existir saldo devedor do utilizador
 - Energia: o restante converte-se em kWh à tarifa vigente
 
-Nota: Os valores aqui são ilustrativos. Em produção, devem ser carregados
-a partir de uma tabela de configuração no Supabase (para permitir actualização
+Nota: Os valores aqui são ilustrativos. Em producao, devem ser carregados
+a partir de uma tabela de configuracao no Supabase (para permitir actualizacao
 sem redeployment).
 """
 
-# ─── Constantes Tarifárias (em MZN) ──────────────────────────────────────────
-# Valores de referência CREDELEC — actualizar conforme tabela EDM vigente
-TARIFA_KWH = 6.50          # MZN por kWh (bloco residencial básico)
+# ─── Constantes Tarifarias (em MZN) ──────────────────────────────────────────
+# Valores de referencia CREDELEC — actualizar conforme tabela EDM vigente
+TARIFA_KWH = 6.50          # MZN por kWh (bloco residencial basico)
 TAXA_IVA = 0.17            # 17%
-TAXA_RADIO = 15.00         # MZN/mês (cobrança única no mês)
-TAXA_LIXO = 10.00          # MZN/mês (cobrança única no mês)
-MONTANTE_MINIMO_MZN = 50.0 # Recarga mínima permitida (RN01)
+TAXA_RADIO = 15.00         # MZN/mes (cobranca unica no mes)
+TAXA_LIXO = 10.00          # MZN/mes (cobranca unica no mes)
+MONTANTE_MINIMO_MZN = 50.0 # Recarga minima permitida (RN01)
 
 
 def calcular_desdobramento(
@@ -28,12 +28,12 @@ def calcular_desdobramento(
     is_primeira_compra_mes: bool = False,
 ) -> dict:
     """
-    Calcula o desdobramento tarifário CREDELEC para um dado montante.
+    Calcula o desdobramento tarifario CREDELEC para um dado montante.
 
     Args:
         montante_total:       Valor total pago pelo utilizador em MZN.
-        divida_pendente:      Saldo devedor existente (se aplicável).
-        is_primeira_compra_mes: Se True, aplica as taxas fixas do mês.
+        divida_pendente:      Saldo devedor existente (se aplicavel).
+        is_primeira_compra_mes: Se True, aplica as taxas fixas do mes.
 
     Returns:
         Dicionário com todos os componentes do desdobramento e kWh resultante.
@@ -46,11 +46,11 @@ def calcular_desdobramento(
 
     restante = montante_total
 
-    # 1. Amortizar dívida pendente primeiro
+    # 1. Amortizar divida pendente primeiro
     divida_paga = min(divida_pendente, restante)
     restante -= divida_paga
 
-    # 2. Taxas fixas mensais (só na primeira recarga do mês)
+    # 2. Taxas fixas mensais (so na primeira recarga do mes)
     tx_radio = 0.0
     tx_lixo = 0.0
     if is_primeira_compra_mes:
@@ -59,8 +59,8 @@ def calcular_desdobramento(
         tx_lixo = min(TAXA_LIXO, restante)
         restante -= tx_lixo
 
-    # 3. IVA calculado sobre o montante de energia (restante após taxas/dívida)
-    # Fórmula: montante_liquido = restante / (1 + IVA)
+    # 3. IVA calculado sobre o montante de energia (restante apos taxas/divida)
+    # Formula: montante_liquido = restante / (1 + IVA)
     montante_energia_liquido = restante / (1 + TAXA_IVA)
     iva = restante - montante_energia_liquido
 

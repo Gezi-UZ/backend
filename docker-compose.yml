@@ -1,20 +1,20 @@
-version: '3.8'
-
 services:
   api:
     build: .
     ports:
       - "8000:8000"
-    volumes:
-      - .:/app
+    env_file:
+      - .env
     environment:
-      - ENVIRONMENT=development
+      - ENVIRONMENT=${ENVIRONMENT:-development}
       - SUPABASE_URL=${SUPABASE_URL}
       - SUPABASE_KEY=${SUPABASE_KEY}
-      - MQTT_BROKER=${MQTT_BROKER:-mqtt.eclipseprojects.io}
-      - MQTT_PORT=${MQTT_PORT:-1883}
+      - DATABASE_URL=${DATABASE_URL}
+      - MQTT_BROKER=${MQTT_BROKER:-broker.hivemq.com}
+      - MQTT_PORT=${MQTT_PORT:-8883}
       - MQTT_USERNAME=${MQTT_USERNAME}
       - MQTT_PASSWORD=${MQTT_PASSWORD}
-      - DATABASE_URL=${DATABASE_URL}
+      - MQTT_USE_TLS=${MQTT_USE_TLS:-true}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
     restart: unless-stopped
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload

@@ -12,10 +12,11 @@ class Settings(BaseSettings):
     
     # MQTT
     mqtt_broker: str = "broker.hivemq.com"
-    mqtt_port: int = 1883
+    mqtt_port: int = 8883
     mqtt_username: str = ""
     mqtt_password: str = ""
     mqtt_client_id: str = "gezi_backend_service"
+    mqtt_use_tls: bool = True
     
     # Auth
     jwt_secret_key: str = ""
