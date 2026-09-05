@@ -17,9 +17,15 @@ from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
+import uuid
+
+# Criar um Client ID único por worker (Uvicorn cria múltiplos processos)
+# Isso previne que o HiveMQ Cloud desconecte constantemente por conflito de Client ID.
+unique_client_id = f"{settings.mqtt_client_id}_{uuid.uuid4().hex[:8]}"
+
 mqtt_client = mqtt.Client(
     mqtt.CallbackAPIVersion.VERSION2,
-    client_id=settings.mqtt_client_id,
+    client_id=unique_client_id,
     transport=settings.mqtt_transport
 )
 
@@ -42,10 +48,11 @@ if settings.mqtt_use_tls:
 def on_connect(client, userdata, flags, reason_code, properties):
     if reason_code == 0:
         logger.info("MQTT: Conectado ao Broker com sucesso!")
-        # Subscrever aos topicos de telemetria e ack de todos os contadores
-        client.subscribe("credelec/meter/+/telemetry", qos=1)
-        client.subscribe("credelec/meter/+/ack", qos=1)
-        logger.info("MQTT: Subscrito a credelec/meter/+/telemetry e credelec/meter/+/ack")
+        # Subscrever aos topicos de telemetria e ack usando Shared Subscriptions ($share/grupo/)
+        # Isso garante que apenas 1 worker processa cada mensagem, evitando duplicados.
+        client.subscribe("$share/gezi_group/credelec/meter/+/telemetry", qos=1)
+        client.subscribe("$share/gezi_group/credelec/meter/+/ack", qos=1)
+        logger.info("MQTT: Subscrito a $share/gezi_group/credelec/meter/+/telemetry e ack")
     else:
         logger.error(f"MQTT: Falha ao conectar ao broker, reason_code={reason_code}")
 
