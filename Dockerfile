@@ -19,8 +19,12 @@ RUN uv pip install -r pyproject.toml
 # Copy the rest of the application
 COPY . .
 
-# Expose port
+# Copy and make the start script executable
+COPY start.sh /start.sh
+RUN chmod +x /start.sh
+
+# Expose port (documentational, Railway uses $PORT)
 EXPOSE 8000
 
 # Command to run the application
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]
+CMD ["/start.sh"]
