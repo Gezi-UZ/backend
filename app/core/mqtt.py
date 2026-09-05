@@ -20,7 +20,12 @@ logger = logging.getLogger(__name__)
 mqtt_client = mqtt.Client(
     mqtt.CallbackAPIVersion.VERSION2,
     client_id=settings.mqtt_client_id,
+    transport=settings.mqtt_transport
 )
+
+if settings.mqtt_transport == "websockets":
+    mqtt_client.ws_set_options(path="/mqtt")
+
 
 # Credenciais
 if settings.mqtt_username and settings.mqtt_password:

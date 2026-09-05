@@ -17,6 +17,8 @@ class Settings(BaseSettings):
     mqtt_password: str = ""
     mqtt_client_id: str = "gezi_backend_service"
     mqtt_use_tls: bool = True
+    mqtt_transport: str = "tcp"  # 'tcp' ou 'websockets'
+    
     
     # Auth
     jwt_secret_key: str = ""
