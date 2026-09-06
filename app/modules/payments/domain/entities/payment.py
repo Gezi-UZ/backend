@@ -17,7 +17,7 @@ class Pagamento(Base, TimestampMixin):
     referencia_mpesa: Mapped[str] = mapped_column(String, unique=True, index=True, nullable=True)
     montante: Mapped[float] = mapped_column(Double)
 
-    # Estados: INITIATED, SUCCESS, FAILED
+    # Estados: INITIATED → PROCESSING → SUCCESS | FAILED
     estado: Mapped[str] = mapped_column(String, default="INITIATED")
     criado_em: Mapped[datetime] = mapped_column(server_default=func.now())
     recarga_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("recarga.id"))

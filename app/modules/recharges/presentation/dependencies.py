@@ -24,8 +24,9 @@ def get_meter_repository(db: Session = Depends(get_db)):
 def get_initiate_recharge_usecase(
     recharge_repo: SQLAlchemyRechargeRepository = Depends(get_recharge_repository),
     meter_repo: SQLAlchemyMeterRepository = Depends(get_meter_repository),
+    db: Session = Depends(get_db),
 ):
-    return InitiateRechargeUseCase(recharge_repo, meter_repo)
+    return InitiateRechargeUseCase(recharge_repo, meter_repo, db)
 
 
 def get_recharge_status_usecase(

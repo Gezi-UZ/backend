@@ -1,10 +1,19 @@
+"""
+Use Cases do módulo de Recargas.
+
+InitiateRechargeUseCase   — RF03: Cria recarga PENDING, dispara STK Push via E2Payments.
+GetRechargeStatusUseCase  — RF03: Consulta estado actual de uma recarga (one-shot).
+GetRechargeHistoryUseCase — RF06: Histórico paginado de recargas.
+GetRechargeDashboardUseCase — RF14: Estatísticas agregadas.
+"""
 import uuid
-import secrets
-import string
+import asyncio
+import logging
 from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import HTTPException
+from sqlalchemy.orm import Session
 
 from app.modules.recharges.domain.repositories.recharge_repository import IRechargeRepository
 from app.modules.meters.domain.repositories.meter_repository import IMeterRepository
@@ -23,67 +32,151 @@ from app.modules.recharges.domain.services.tariff_calculator import (
     MONTANTE_MINIMO_MZN,
 )
 
-
-def _gerar_token_sts() -> str:
-    """Gera um token STS CREDELEC no formato XXXX-XXXX-XXXX-XXXX."""
-    digits = string.digits
-    grupos = [
-        "".join(secrets.choice(digits) for _ in range(4))
-        for _ in range(4)
-    ]
-    return "-".join(grupos)
+logger = logging.getLogger(__name__)
 
 
 class InitiateRechargeUseCase:
     """
     RF03 — Inicia o processo de recarga.
-    Cria registo PENDING, calcula o desdobramento tarifário CREDELEC
-    e devolve o montante estimado em kWh.
+
+    Pipeline:
+      1. Valida montante mínimo (RN01) e posse do contador (RN09)
+      2. Calcula o desdobramento tarifário CREDELEC
+      3. Cria registo Recarga com estado PENDING
+      4. Resolve o número de telefone (do request ou do perfil do utilizador)
+      5. Cria Pagamento e dispara STK Push via E2Payments
+      6. Actualiza Recarga para PAYMENT_PROCESSING
+      7. Retorna resposta com estado do pagamento
     """
 
-    def __init__(self, recharge_repo: IRechargeRepository, meter_repo: IMeterRepository):
+    def __init__(
+        self,
+        recharge_repo: IRechargeRepository,
+        meter_repo: IMeterRepository,
+        db: Session,
+    ):
         self.recharge_repo = recharge_repo
         self.meter_repo = meter_repo
+        self.db = db
 
-    def execute(self, user_id: uuid.UUID, data: RechargeInitiateRequest) -> RechargeInitiateResponse:
-        # Validar montante mínimo (RN01)
+    async def execute(
+        self, user_id: uuid.UUID, data: RechargeInitiateRequest
+    ) -> RechargeInitiateResponse:
+        # 1. Validar montante mínimo (RN01)
         if data.amount_mzn < MONTANTE_MINIMO_MZN:
             raise HTTPException(
                 status_code=422,
-                detail=f"Valor mínimo de recarga é {MONTANTE_MINIMO_MZN} MZN."
+                detail=f"Valor mínimo de recarga é {MONTANTE_MINIMO_MZN} MZN.",
             )
 
-        # Verificar que o contador pertence ao utilizador (RN09)
+        # 2. Verificar que o contador pertence ao utilizador (RN09)
         meter = self.meter_repo.get_by_id(data.meter_id)
         if not meter:
             raise HTTPException(status_code=404, detail="Contador não encontrado.")
         if meter.utilizador_id != user_id:
             raise HTTPException(
                 status_code=403,
-                detail="Contador não pertence ao utilizador autenticado."
+                detail="Contador não pertence ao utilizador autenticado.",
             )
 
-        # Calcular desdobramento tarifário
+        # 3. Calcular desdobramento tarifário
         breakdown = calcular_desdobramento(
             montante_total=data.amount_mzn,
             divida_pendente=0.0,  # TODO: integrar com sistema de dívidas EDM
             is_primeira_compra_mes=False,  # TODO: verificar histórico do mês
         )
 
-        # Criar recarga com estado PENDING
+        # 4. Criar recarga com estado PENDING
         recharge = self.recharge_repo.create_with_breakdown(
             meter_id=data.meter_id,
             montante=data.amount_mzn,
             breakdown_data=breakdown,
         )
 
+        # 5. Resolver número de telefone para o STK Push
+        phone = self._resolve_phone(data.phone, user_id)
+
+        # 6. Disparar STK Push via E2Payments
+        payment_status = "INITIATED"
+        if phone:
+            payment_status = await self._initiate_payment(
+                recharge_id=recharge.id,
+                user_id=user_id,
+                amount=data.amount_mzn,
+                phone=phone,
+            )
+            # Actualizar estado da recarga para PAYMENT_PROCESSING
+            if payment_status == "PROCESSING":
+                self.recharge_repo.update_status(recharge.id, "PAYMENT_PROCESSING")
+        else:
+            logger.warning(
+                f"Recarga {recharge.id}: Sem telefone disponível para STK Push. "
+                "Aguardando reconciliação manual ou callback."
+            )
+
         return RechargeInitiateResponse(
             recharge_id=recharge.id,
-            status=recharge.estado,
+            status="PAYMENT_PROCESSING" if payment_status == "PROCESSING" else recharge.estado,
             amount_mzn=recharge.montante_pago,
             estimated_kwh=breakdown["kwh_calculado"],
+            payment_status=payment_status,
             breakdown=RechargeBreakdownResponse(**breakdown),
         )
+
+    def _resolve_phone(self, phone_from_request: Optional[str], user_id: uuid.UUID) -> Optional[str]:
+        """
+        Resolve o número de telefone para o STK Push.
+        Prioridade: campo do request → telefone do perfil do utilizador.
+        """
+        if phone_from_request:
+            return phone_from_request
+
+        # Tentar obter do perfil do utilizador
+        try:
+            from app.modules.users.domain.entities.user import Utilizador
+            user = self.db.query(Utilizador).filter(Utilizador.id == user_id).first()
+            if user and user.telefone:
+                # O telefone está guardado com 9 dígitos
+                return user.telefone
+        except Exception as exc:
+            logger.warning(f"Não foi possível obter telefone do utilizador {user_id}: {exc}")
+
+        return None
+
+    async def _initiate_payment(
+        self,
+        recharge_id: uuid.UUID,
+        user_id: uuid.UUID,
+        amount: float,
+        phone: str,
+    ) -> str:
+        """
+        Cria o Pagamento e chama o E2Payments. Retorna o estado resultante.
+        Nunca propaga excepções — falha silenciosa com log (a reconciliação trata).
+        """
+        try:
+            from app.modules.payments.application.usecases.payment_service import InitiatePaymentUseCase
+            from app.modules.payments.infrastructure.providers.e2payments import E2PaymentsProvider
+            from app.core.config import settings
+
+            gateway = E2PaymentsProvider(
+                base_url=settings.e2payments_base_url,
+                client_id=settings.e2payments_client_id,
+                client_secret=settings.e2payments_client_secret,
+                wallet_id=settings.e2payments_wallet_id,
+            )
+            usecase = InitiatePaymentUseCase(db=self.db, gateway=gateway)
+            pagamento = await usecase.execute(
+                recharge_id=recharge_id,
+                user_id=user_id,
+                amount=amount,
+                phone=phone,
+            )
+            return pagamento.estado  # "PROCESSING" ou "FAILED"
+
+        except Exception as exc:
+            logger.error(f"Erro ao iniciar pagamento para recarga {recharge_id}: {exc}")
+            return "FAILED"
 
 
 class GetRechargeStatusUseCase:

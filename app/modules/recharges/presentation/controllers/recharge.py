@@ -32,16 +32,56 @@ from app.modules.recharges.application.usecases.manual_code import ApplyManualCo
 router = APIRouter()
 
 
+async def _poll_reconcile_for_recharge(recharge_key: str, interval: float = 5.0):
+    """
+    Opção C — Polling rápido de reconciliação enquanto o SSE stream está ativo.
+
+    Corre em paralelo com o event_bus listener. A cada `interval` segundos
+    chama o ReconcilePaymentsUseCase para detectar se o pagamento foi confirmado
+    no E2Payments. Quando confirmado, o ConfirmPaymentUseCase emite o evento SSE
+    que faz o loop principal avançar e fechar a stream.
+    """
+    from app.modules.payments.application.usecases.payment_service import ReconcilePaymentsUseCase
+    from app.modules.payments.infrastructure.providers.e2payments import E2PaymentsProvider
+    from app.core.config import settings
+    from app.core.database import SessionLocal
+
+    gateway = E2PaymentsProvider(
+        base_url=settings.e2payments_base_url,
+        client_id=settings.e2payments_client_id,
+        client_secret=settings.e2payments_client_secret,
+        wallet_id=settings.e2payments_wallet_id,
+    )
+
+    while True:
+        await asyncio.sleep(interval)
+        db = SessionLocal()
+        try:
+            usecase = ReconcilePaymentsUseCase(db=db, gateway=gateway)
+            await usecase.execute(limit=10)
+        except Exception as exc:
+            import logging
+            logging.getLogger(__name__).warning(
+                f"SSE polling para '{recharge_key}': erro na reconciliação: {exc}"
+            )
+        finally:
+            db.close()
+
+
 @router.post("/initiate", status_code=201)
-def initiate_recharge(
+async def initiate_recharge(
     data: RechargeInitiateRequest,
     current_user: AuthUser = Depends(get_current_user),
     usecase: InitiateRechargeUseCase = Depends(get_initiate_recharge_usecase),
 ) -> Dict[str, Any]:
     """
-    RF03 — Inicia o processo de recarga (cria registo PENDING antes do pagamento).
+    RF03 — Inicia o processo de recarga.
+
+    Cria um registo PENDING e dispara imediatamente o STK Push no telemóvel
+    do cliente via E2Payments/M-Pesa. O cliente confirma o PIN no telemóvel
+    e o estado é actualizado via polling (SSE stream + background task).
     """
-    result = usecase.execute(current_user.id, data)
+    result = await usecase.execute(current_user.id, data)
     return {
         "success": True,
         "data": result.model_dump(),
@@ -100,20 +140,31 @@ async def stream_recharge_status(
                 yield f"data: {json.dumps({'event': 'stream_end'})}\n\n"
                 return
 
-            # Escutar eventos do event bus
-            while True:
-                try:
-                    event = await asyncio.wait_for(queue.get(), timeout=30.0)
-                    yield f"data: {json.dumps(event, default=str)}\n\n"
+            # Opção C — Polling rápido a cada 5s enquanto o stream está ativo.
+            # Roda em paralelo com a escuta do EventBus (background task local).
+            poll_task = asyncio.create_task(_poll_reconcile_for_recharge(recharge_key))
 
-                    # Fechar stream se recarga terminou
-                    status_data = event.get("data", {})
-                    if status_data.get("status") in ("CONCLUIDA", "FAILED", "REFUNDED"):
-                        yield f"data: {json.dumps({'event': 'stream_end'})}\n\n"
-                        return
-                except asyncio.TimeoutError:
-                    # Heartbeat para manter a conexao viva
-                    yield ": heartbeat\n\n"
+            try:
+                # Escutar eventos do event bus
+                while True:
+                    try:
+                        event = await asyncio.wait_for(queue.get(), timeout=5.0)
+                        yield f"data: {json.dumps(event, default=str)}\n\n"
+
+                        # Fechar stream se recarga terminou
+                        status_data = event.get("data", {})
+                        if status_data.get("status") in ("CONCLUIDA", "FAILED", "REFUNDED"):
+                            yield f"data: {json.dumps({'event': 'stream_end'})}\n\n"
+                            return
+                    except asyncio.TimeoutError:
+                        # Heartbeat — mantém conexão viva enquanto o poll_task trabalha
+                        yield ": heartbeat\n\n"
+            finally:
+                poll_task.cancel()
+                try:
+                    await poll_task
+                except asyncio.CancelledError:
+                    pass
         finally:
             event_bus.unsubscribe(recharge_key, queue)
 

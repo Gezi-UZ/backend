@@ -20,6 +20,12 @@ class Settings(BaseSettings):
     mqtt_transport: str = "tcp"  # 'tcp' ou 'websockets'
     
     
+    # E2Payments (M-Pesa Gateway)
+    e2payments_base_url: str = "https://e2payments.explicador.co.mz"
+    e2payments_client_id: str = ""
+    e2payments_client_secret: str = ""
+    e2payments_wallet_id: str = ""
+
     # Auth
     jwt_secret_key: str = ""
     jwt_algorithm: str = "HS256"

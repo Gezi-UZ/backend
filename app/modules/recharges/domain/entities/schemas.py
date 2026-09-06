@@ -9,6 +9,14 @@ from datetime import datetime
 class RechargeInitiateRequest(BaseModel):
     meter_id: uuid.UUID
     amount_mzn: float = Field(..., gt=0, description="Montante em MZN (deve ser positivo)")
+    phone: Optional[str] = Field(
+        None,
+        description=(
+            "Número de telefone Mpesa (9 dígitos, ex: 848512345). "
+            "Se omitido, usa o telefone do perfil do utilizador."
+        ),
+        pattern=r"^8[4-7]\d{7}$",
+    )
 
 
 class ManualCodeRequest(BaseModel):
@@ -34,6 +42,7 @@ class RechargeInitiateResponse(BaseModel):
     status: str
     amount_mzn: float
     estimated_kwh: float
+    payment_status: str = "INITIATED"  # Estado do STK Push: INITIATED, PROCESSING, FAILED
     breakdown: Optional[RechargeBreakdownResponse] = None
 
 
