@@ -10,7 +10,7 @@ class SupabaseJWTProvider(IJWTProvider):
         self.secret_key = settings.jwt_secret_key
         self.algorithm = settings.jwt_algorithm
         self.jwks_url = settings.supabase_jwks_url
-        self.jwks_client = PyJWKClient(self.jwks_url) if self.jwks_url and self.algorithm == "RS256" else None
+        self.jwks_client = PyJWKClient(self.jwks_url) if self.jwks_url and self.algorithm in ["RS256", "ES256"] else None
 
     def verify_token(self, token: str) -> TokenPayload:
         if not self.secret_key and not self.jwks_client:
@@ -20,7 +20,7 @@ class SupabaseJWTProvider(IJWTProvider):
             )
             
         try:
-            if self.algorithm == "RS256" and self.jwks_client:
+            if self.algorithm in ["RS256", "ES256"] and self.jwks_client:
                 signing_key = self.jwks_client.get_signing_key_from_jwt(token)
                 key = signing_key.key
             else:
