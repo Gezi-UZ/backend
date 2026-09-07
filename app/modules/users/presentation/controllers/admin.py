@@ -20,6 +20,7 @@ def get_all_users(
 ):
     """
     List all users (Admin only).
+    """
     return usecase.execute(skip=skip, limit=limit)
 
 @router.post("/users", response_model=UserResponse)

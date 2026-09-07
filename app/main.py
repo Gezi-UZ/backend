@@ -10,6 +10,7 @@ from app.core.router import api_router
 from app.core.reconciliation import reconciliation_task
 
 logging.basicConfig(level=logging.INFO)
+logging.getLogger("httpx").setLevel(logging.WARNING)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
