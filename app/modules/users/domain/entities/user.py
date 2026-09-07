@@ -13,7 +13,7 @@ Table(
     Base.metadata,
     Column("id", PostgresUUID(as_uuid=True), primary_key=True),
     schema="auth",
-    keep_existing=True,
+    extend_existing=True,
 )
 
 if TYPE_CHECKING:

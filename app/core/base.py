@@ -13,10 +13,4 @@ from app.modules.audit.domain.entities.audit import LogAuditoria
 from sqlalchemy import Table, Column, String
 from sqlalchemy.dialects.postgresql import UUID
 
-# Define the external Supabase auth.users table so SQLAlchemy can resolve the ForeignKey
-Table(
-    "users",
-    Base.metadata,
-    Column("id", UUID(as_uuid=True), primary_key=True),
-    schema="auth",
-)
+
