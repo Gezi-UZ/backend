@@ -5,6 +5,17 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base, TimestampMixin
 
+from sqlalchemy import Table, Column
+from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
+
+Table(
+    "users",
+    Base.metadata,
+    Column("id", PostgresUUID(as_uuid=True), primary_key=True),
+    schema="auth",
+    keep_existing=True,
+)
+
 if TYPE_CHECKING:
     from app.modules.meters.domain.entities.meter import Contador
     from app.modules.payments.domain.entities.payment import Pagamento
