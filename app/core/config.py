@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     # Auth
     jwt_secret_key: str = ""
     jwt_algorithm: str = "HS256"
+    supabase_jwks_url: str = ""
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
