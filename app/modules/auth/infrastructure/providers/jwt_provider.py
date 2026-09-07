@@ -21,7 +21,7 @@ class SupabaseJWTProvider(IJWTProvider):
                 token, 
                 self.secret_key, 
                 algorithms=[self.algorithm],
-                audience="authenticated"
+                options={"verify_aud": False}
             )
             return TokenPayload(**payload)
         except jwt.ExpiredSignatureError:
