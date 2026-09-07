@@ -10,5 +10,5 @@ class AuthUser(BaseModel):
 class TokenPayload(BaseModel):
     sub: str
     phone: str | None = None
-    role: Literal["cliente", "admin"] | None = None
+    role: str | None = None
     exp: int
