@@ -50,4 +50,7 @@ class Recarga(Base, TimestampMixin):
         cascade="all, delete-orphan"
     )
     # Relacao 1 para N com Pagamentos (varias tentativas permitidas)
-    pagamentos: Mapped[list["Pagamento"]] = relationship(back_populates="recarga")
+    pagamentos: Mapped[list["Pagamento"]] = relationship(
+        back_populates="recarga",
+        foreign_keys="[Pagamento.recarga_id]"
+    )

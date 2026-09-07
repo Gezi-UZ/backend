@@ -23,5 +23,8 @@ class Pagamento(Base, TimestampMixin):
     recarga_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("recarga.id"))
     utilizador_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("utilizadores.id"))
     
-    recarga: Mapped["Recarga"] = relationship(back_populates="pagamentos")
+    recarga: Mapped["Recarga"] = relationship(
+        back_populates="pagamentos",
+        foreign_keys="[Pagamento.recarga_id]"
+    )
     utilizador: Mapped["Utilizador"] = relationship(back_populates="pagamentos")
