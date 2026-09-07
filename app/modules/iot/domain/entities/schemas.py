@@ -41,5 +41,21 @@ class MeterTelemetryResponse(BaseModel):
 class PaymentCallbackRequest(BaseModel):
     """Payload recebido do callback M-Pesa."""
     referencia_mpesa: str = Field(..., description="Referencia unica da transacao M-Pesa")
-    montante: float = Field(..., gt=0)
     estado: str = Field(default="SUCCESS", description="Estado do pagamento: SUCCESS, FAILED")
+
+class IoTAdminDeviceResponse(BaseModel):
+    id: uuid.UUID
+    mac_address: str
+    firmware_version: Optional[str] = None
+    estado: str
+    ultimo_heartbeat: Optional[datetime] = None
+    meter_id: Optional[uuid.UUID] = None
+    meter_serial: Optional[str] = None
+    
+    class Config:
+        from_attributes = True
+
+class IoTAdminDeviceListResponse(BaseModel):
+    devices: list[IoTAdminDeviceResponse]
+    total: int
+

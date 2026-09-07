@@ -51,3 +51,10 @@ class MeterStatusResponse(BaseModel):
     class Config:
         from_attributes = True
         populate_by_name = True
+
+class AdminMeterDetailResponse(MeterResponse):
+    owner_name: Optional[str] = None
+    owner_phone: Optional[str] = None
+    device_mac: Optional[str] = None
+    firmware_version: Optional[str] = None
+    last_seen_at: Optional[datetime] = None

@@ -17,8 +17,18 @@ class UserUpdate(BaseModel):
 
 class UserResponse(UserBase):
     id: uuid.UUID
+    is_active: bool = True
     created_at: datetime
     updated_at: datetime | None = None
 
     class Config:
         from_attributes = True
+
+class AdminCreateUserRequest(BaseModel):
+    id: uuid.UUID
+    telefone: str
+    nome: str
+    papel: str = "admin"
+
+class AdminUpdateUserStatusRequest(BaseModel):
+    is_active: bool

@@ -10,6 +10,7 @@ from app.modules.recharges.domain.entities.recharge import Recarga
 from app.modules.recharges.domain.entities.recharge_breakdown import DesdobramentoRecarga
 from app.modules.recharges.domain.entities.schemas import RechargeInitiateRequest
 from app.modules.meters.domain.entities.meter import Contador
+from app.modules.users.domain.entities.user import Utilizador
 
 
 class SQLAlchemyRechargeRepository(IRechargeRepository):
@@ -98,6 +99,61 @@ class SQLAlchemyRechargeRepository(IRechargeRepository):
         total = query.count()
         recharges = query.order_by(Recarga.criado_em.desc()).offset(skip).limit(limit).all()
         return recharges, total
+
+    def get_all_admin(
+        self,
+        status: Optional[str] = None,
+        from_date: Optional[datetime] = None,
+        to_date: Optional[datetime] = None,
+        meter_id: Optional[uuid.UUID] = None,
+        skip: int = 0,
+        limit: int = 20,
+    ) -> tuple[List[dict], int]:
+        query = (
+            self.db.query(
+                Recarga.id,
+                Recarga.utilizador_id,
+                Utilizador.nome.label("user_name"),
+                Recarga.contador_id,
+                Contador.numero_serie.label("meter_serial"),
+                Recarga.montante_pago,
+                Recarga.kwh_creditado,
+                Recarga.metodo,
+                Recarga.estado,
+                Recarga.criado_em
+            )
+            .join(Contador, Recarga.contador_id == Contador.id)
+            .join(Utilizador, Recarga.utilizador_id == Utilizador.id)
+        )
+        
+        if status:
+            query = query.filter(Recarga.estado == status)
+        if meter_id:
+            query = query.filter(Recarga.contador_id == meter_id)
+        if from_date:
+            query = query.filter(Recarga.criado_em >= from_date)
+        if to_date:
+            query = query.filter(Recarga.criado_em <= to_date)
+
+        total = query.count()
+        results = query.order_by(Recarga.criado_em.desc()).offset(skip).limit(limit).all()
+        
+        formatted = []
+        for r in results:
+            formatted.append({
+                "recharge_id": r.id,
+                "user_id": r.utilizador_id,
+                "user_name": r.user_name,
+                "meter_id": r.contador_id,
+                "meter_serial": r.meter_serial,
+                "amount_mzn": r.montante_pago,
+                "credit_kwh": r.kwh_creditado,
+                "payment_method": r.metodo,
+                "status": r.estado,
+                "created_at": r.criado_em
+            })
+            
+        return formatted, total
 
     def update_status(self, recharge_id: uuid.UUID, new_status: str) -> Optional[Recarga]:
         db_recharge = self.get_by_id(recharge_id)

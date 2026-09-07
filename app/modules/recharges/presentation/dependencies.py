@@ -12,6 +12,8 @@ from app.modules.recharges.application.usecases.recharge_service import (
 )
 from app.modules.recharges.application.usecases.manual_code import ApplyManualCodeUseCase
 
+from app.modules.recharges.application.usecases.admin_transactions import ListAdminTransactionsUseCase
+
 
 def get_recharge_repository(db: Session = Depends(get_db)):
     return SQLAlchemyRechargeRepository(db)
@@ -53,3 +55,8 @@ def get_apply_manual_code_usecase(
     meter_repo: SQLAlchemyMeterRepository = Depends(get_meter_repository),
 ):
     return ApplyManualCodeUseCase(recharge_repo, meter_repo)
+
+def get_list_admin_transactions_usecase(
+    recharge_repo: SQLAlchemyRechargeRepository = Depends(get_recharge_repository)
+):
+    return ListAdminTransactionsUseCase(recharge_repo)

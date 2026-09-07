@@ -6,6 +6,8 @@ from app.modules.users.application.usecases.create_user import CreateUserUseCase
 from app.modules.users.application.usecases.get_user import GetUserUseCase
 from app.modules.users.application.usecases.update_user import UpdateUserUseCase
 from app.modules.users.application.usecases.list_users import ListUsersUseCase
+from app.modules.users.application.usecases.create_admin_user import CreateAdminUserUseCase
+from app.modules.users.application.usecases.update_user_status import UpdateUserStatusUseCase
 
 def get_user_repository(db: Session = Depends(get_db)):
     return SQLAlchemyUserRepository(db)
@@ -21,3 +23,9 @@ def get_update_user_usecase(repo: SQLAlchemyUserRepository = Depends(get_user_re
 
 def get_list_users_usecase(repo: SQLAlchemyUserRepository = Depends(get_user_repository)):
     return ListUsersUseCase(repo)
+
+def get_create_admin_user_usecase(repo: SQLAlchemyUserRepository = Depends(get_user_repository)):
+    return CreateAdminUserUseCase(repo)
+
+def get_update_user_status_usecase(repo: SQLAlchemyUserRepository = Depends(get_user_repository)):
+    return UpdateUserStatusUseCase(repo)

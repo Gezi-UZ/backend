@@ -24,8 +24,8 @@ class Utilizador(Base, TimestampMixin):
     )
     nome: Mapped[str] = mapped_column(String)
     papel: Mapped[str] = mapped_column(String, default="cliente")
-
     biometria_activa: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
     # Relacionamentos
     contadores: Mapped[list["Contador"]] = relationship(back_populates="utilizador")

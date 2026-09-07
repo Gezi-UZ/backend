@@ -31,6 +31,14 @@ class SQLAlchemyUserRepository(IUserRepository):
             self.db.commit()
             self.db.refresh(db_user)
         return db_user
+        
+    def update_status(self, user_id: uuid.UUID, is_active: bool) -> Optional[Utilizador]:
+        db_user = self.get_by_id(user_id)
+        if db_user:
+            db_user.is_active = is_active
+            self.db.commit()
+            self.db.refresh(db_user)
+        return db_user
 
     def get_all(self, skip: int = 0, limit: int = 100) -> List[Utilizador]:
         return self.db.query(Utilizador).offset(skip).limit(limit).all()

@@ -87,3 +87,22 @@ class ManualCodeResponse(BaseModel):
     recharge_id: uuid.UUID
     status: str
     credit_kwh: Optional[float] = None
+
+class AdminTransactionResponse(BaseModel):
+    recharge_id: uuid.UUID
+    user_id: uuid.UUID
+    user_name: Optional[str] = None
+    meter_id: uuid.UUID
+    meter_serial: Optional[str] = None
+    amount_mzn: float
+    credit_kwh: Optional[float] = None
+    payment_method: str
+    status: str
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+class AdminTransactionListResponse(BaseModel):
+    transactions: List[AdminTransactionResponse]
+    pagination: PaginationMeta
