@@ -18,7 +18,7 @@ class IMeterRepository(ABC):
         pass
 
     @abstractmethod
-    def create(self, user_id: uuid.UUID, meter: MeterCreate) -> Contador:
+    def create(self, user_id: Optional[uuid.UUID], meter: MeterCreate) -> Contador:
         pass
 
     @abstractmethod

@@ -22,5 +22,5 @@ class IUserRepository(ABC):
         pass
 
     @abstractmethod
-    def get_all(self, skip: int = 0, limit: int = 100) -> List[Utilizador]:
+    def get_all(self, skip: int = 0, limit: int = 100, role: Optional[str] = None) -> List[Utilizador]:
         pass

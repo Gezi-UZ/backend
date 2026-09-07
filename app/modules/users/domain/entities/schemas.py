@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 import uuid
 from datetime import datetime
 
@@ -18,11 +18,12 @@ class UserUpdate(BaseModel):
 class UserResponse(UserBase):
     id: uuid.UUID
     is_active: bool = True
-    created_at: datetime
-    updated_at: datetime | None = None
+    created_at: datetime = Field(validation_alias="criado_em")
+    updated_at: datetime | None = Field(None, validation_alias="actualizado_em")
 
     class Config:
         from_attributes = True
+        populate_by_name = True
 
 class AdminCreateUserRequest(BaseModel):
     id: uuid.UUID

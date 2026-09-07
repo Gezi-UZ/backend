@@ -40,5 +40,8 @@ class SQLAlchemyUserRepository(IUserRepository):
             self.db.refresh(db_user)
         return db_user
 
-    def get_all(self, skip: int = 0, limit: int = 100) -> List[Utilizador]:
-        return self.db.query(Utilizador).offset(skip).limit(limit).all()
+    def get_all(self, skip: int = 0, limit: int = 100, role: Optional[str] = None) -> List[Utilizador]:
+        query = self.db.query(Utilizador)
+        if role:
+            query = query.filter(Utilizador.papel == role)
+        return query.offset(skip).limit(limit).all()

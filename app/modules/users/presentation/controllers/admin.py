@@ -1,5 +1,5 @@
-from fastapi import APIRouter, Depends
-from typing import List
+from fastapi import APIRouter, Depends, Query
+from typing import List, Optional
 from app.modules.auth.presentation.dependencies import get_admin_user
 from app.modules.auth.domain.entities.auth import AuthUser
 from app.modules.users.domain.entities.schemas import UserResponse, AdminCreateUserRequest, AdminUpdateUserStatusRequest
@@ -15,13 +15,14 @@ router = APIRouter()
 def get_all_users(
     skip: int = 0,
     limit: int = 100,
+    role: Optional[str] = Query(None, description="Filter by role"),
     admin_user: AuthUser = Depends(get_admin_user),
     usecase: ListUsersUseCase = Depends(get_list_users_usecase)
 ):
     """
     List all users (Admin only).
     """
-    return usecase.execute(skip=skip, limit=limit)
+    return usecase.execute(skip=skip, limit=limit, role=role)
 
 @router.post("/users", response_model=UserResponse)
 def create_admin_user(

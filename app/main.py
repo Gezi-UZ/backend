@@ -8,6 +8,7 @@ from app.core.config import settings
 from app.core.mqtt import start_mqtt, stop_mqtt
 from app.core.router import api_router
 from app.core.reconciliation import reconciliation_task
+import app.core.base  # Import all models for SQLAlchemy registry
 
 logging.basicConfig(level=logging.INFO)
 logging.getLogger("httpx").setLevel(logging.WARNING)

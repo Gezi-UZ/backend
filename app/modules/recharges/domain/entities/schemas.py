@@ -59,10 +59,11 @@ class RechargeHistoryItem(BaseModel):
     amount_mzn: float
     credit_kwh: Optional[float] = None
     status: str
-    created_at: datetime
+    created_at: datetime = Field(validation_alias="criado_em")
 
     class Config:
         from_attributes = True
+        populate_by_name = True
 
 
 class PaginationMeta(BaseModel):
@@ -98,10 +99,11 @@ class AdminTransactionResponse(BaseModel):
     credit_kwh: Optional[float] = None
     payment_method: str
     status: str
-    created_at: datetime
+    created_at: datetime = Field(validation_alias="criado_em")
     
     class Config:
         from_attributes = True
+        populate_by_name = True
 
 class AdminTransactionListResponse(BaseModel):
     transactions: List[AdminTransactionResponse]

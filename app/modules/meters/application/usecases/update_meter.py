@@ -16,5 +16,8 @@ class UpdateMeterUseCase:
         if meter.utilizador_id != user_id:
             raise HTTPException(status_code=403, detail="Contador não pertence ao utilizador autenticado")
             
+        # Prevent standard users from re-assigning owner_id
+        meter_update.owner_id = None
+        
         updated_meter = self.meter_repo.update(meter_id, meter_update)
         return updated_meter

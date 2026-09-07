@@ -18,7 +18,7 @@ class SQLAlchemyMeterRepository(IMeterRepository):
     def get_by_user_id(self, user_id: uuid.UUID) -> List[Contador]:
         return self.db.query(Contador).filter(Contador.utilizador_id == user_id).all()
 
-    def create(self, user_id: uuid.UUID, meter: MeterCreate) -> Contador:
+    def create(self, user_id: Optional[uuid.UUID], meter: MeterCreate) -> Contador:
         db_meter = Contador(
             numero_serie=meter.serial_number,
             label=meter.label,
@@ -42,6 +42,12 @@ class SQLAlchemyMeterRepository(IMeterRepository):
                 db_meter.latitude = meter_update.location.latitude
                 db_meter.longitude = meter_update.location.longitude
                 db_meter.address = meter_update.location.address
+            # Allow resetting owner if explicitly provided (e.g. some constant) but typically None means don't update.
+            # To set owner_id, we check if it is part of the request.
+            # Actually, Pydantic's exclude_unset is better, but here we just check if it's set. 
+            # We'll use hasattr to see if owner_id was provided (if we use BaseModel.model_dump)
+            if getattr(meter_update, "owner_id", None) is not None:
+                db_meter.utilizador_id = meter_update.owner_id
             self.db.commit()
             self.db.refresh(db_meter)
         return db_meter
@@ -65,7 +71,7 @@ class SQLAlchemyMeterRepository(IMeterRepository):
                 DispositivoIoT.firmware_version.label("firmware_version"),
                 DispositivoIoT.ultimo_heartbeat.label("last_seen_at")
             )
-            .join(Utilizador, Contador.utilizador_id == Utilizador.id)
+            .outerjoin(Utilizador, Contador.utilizador_id == Utilizador.id)
             .outerjoin(DispositivoIoT, Contador.dispositivo_id == DispositivoIoT.id)
         )
         

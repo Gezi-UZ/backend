@@ -10,6 +10,7 @@ from app.modules.meters.application.usecases.get_meter_status import GetMeterSta
 from app.modules.meters.application.usecases.list_all_meters import ListAllMetersUseCase
 from app.modules.meters.application.usecases.list_all_meters_detailed import ListAllMetersDetailedUseCase
 from app.modules.meters.application.usecases.admin_update_meter import AdminUpdateMeterUseCase
+from app.modules.meters.application.usecases.admin_create_meter import AdminCreateMeterUseCase
 
 def get_meter_repository(db: Session = Depends(get_db)):
     return SQLAlchemyMeterRepository(db)
@@ -37,3 +38,6 @@ def get_list_all_meters_detailed_usecase(repo: SQLAlchemyMeterRepository = Depen
 
 def get_admin_update_meter_usecase(repo: SQLAlchemyMeterRepository = Depends(get_meter_repository)):
     return AdminUpdateMeterUseCase(repo)
+
+def get_admin_create_meter_usecase(repo: SQLAlchemyMeterRepository = Depends(get_meter_repository)):
+    return AdminCreateMeterUseCase(repo)

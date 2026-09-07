@@ -16,6 +16,10 @@ class MeterCreate(BaseModel):
 class MeterUpdate(BaseModel):
     label: Optional[str] = None
     location: Optional[MeterLocation] = None
+    owner_id: Optional[uuid.UUID] = None
+
+class AdminMeterCreate(MeterCreate):
+    owner_id: Optional[uuid.UUID] = None
 
 class MeterResponse(BaseModel):
     meter_id: uuid.UUID = Field(alias="id") # The docs use 'meter_id' but DB has 'id'

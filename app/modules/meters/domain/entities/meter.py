@@ -29,7 +29,7 @@ class Contador(Base, TimestampMixin):
     ultima_recarga: Mapped[datetime] = mapped_column(nullable=True)
     
     # Chaves Estrangeiras
-    utilizador_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("utilizadores.id"))
+    utilizador_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("utilizadores.id"), nullable=True)
     # O dispositivo_id ser nullable=True permite ter contadores no sistema antes de instalar o hardware
     dispositivo_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("dispositivo_iot.id"), unique=True, nullable=True)
     
