@@ -185,7 +185,7 @@ def _handle_hello(mac_address: str, payload: dict):
                     db.commit()
                     logger.info(f"MQTT: Modulo IoT {mac_address} reconectado")
 
-                # Procurar contadores vinculados a este dispositivo físico
+                # Auto-provisionamento no boot: Envia configuração se já tiver contadores vinculados
                 contadores = db.query(Contador).filter(Contador.dispositivo_id == dispositivo.id).all()
                 c0 = next((c.numero_serie for c in contadores if c.canal == 0), None)
                 c1 = next((c.numero_serie for c in contadores if c.canal == 1), None)
@@ -197,7 +197,7 @@ def _handle_hello(mac_address: str, payload: dict):
                     }
                     config_topic = f"gezi/v1/{mac_address}/config"
                     mqtt_client.publish(config_topic, json.dumps(config_payload), qos=1)
-                    logger.info(f"MQTT: Configuração de seriais enviada para {mac_address}: {config_payload}")
+                    logger.info(f"MQTT: Configuração de seriais reenviada no boot para {mac_address}: {config_payload}")
             finally:
                 db.close()
         except Exception as e:

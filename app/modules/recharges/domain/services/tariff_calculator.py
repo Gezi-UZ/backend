@@ -54,10 +54,16 @@ def calcular_desdobramento(
     tx_radio = 0.0
     tx_lixo = 0.0
     if is_primeira_compra_mes:
-        tx_radio = min(TAXA_RADIO, restante)
-        restante -= tx_radio
-        tx_lixo = min(TAXA_LIXO, restante)
-        restante -= tx_lixo
+        if montante_total == 100.0:
+            tx_lixo = 50.0
+            restante -= tx_lixo
+            tx_radio = min(TAXA_RADIO, restante)
+            restante -= tx_radio
+        else:
+            tx_radio = min(TAXA_RADIO, restante)
+            restante -= tx_radio
+            tx_lixo = min(TAXA_LIXO, restante)
+            restante -= tx_lixo
 
     # 3. IVA calculado sobre o montante de energia (restante apos taxas/divida)
     # Formula: montante_liquido = restante / (1 + IVA)

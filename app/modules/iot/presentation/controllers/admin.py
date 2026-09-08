@@ -7,13 +7,15 @@ from app.modules.auth.presentation.dependencies import get_admin_user
 from app.modules.auth.domain.entities.auth import AuthUser
 from app.modules.iot.presentation.dependencies import get_list_iot_devices_usecase
 from app.modules.iot.application.usecases.list_iot_devices import ListIoTDevicesUseCase
-from app.modules.iot.domain.entities.schemas import IoTCommandRequest, IoTCommandResponse
+from app.modules.iot.domain.entities.schemas import IoTCommandRequest, IoTCommandResponse, BindMetersRequest
 from app.modules.iot.domain.entities.comando_iot import ComandoIoT
 from app.modules.iot.domain.entities.iot import DispositivoIoT
 from app.modules.meters.domain.entities.meter import Contador
 from datetime import datetime
 import uuid
 import logging
+import json
+from app.core.mqtt import mqtt_client
 
 logger = logging.getLogger(__name__)
 
@@ -89,3 +91,66 @@ def admin_send_iot_command(
         status="ENVIADO",
         sent_at=datetime.utcnow(),
     )
+
+@router.post("/iot-modules/{device_id}/bind-meters", status_code=200)
+def bind_meters_to_device(
+    device_id: uuid.UUID,
+    data: BindMetersRequest,
+    admin_user: AuthUser = Depends(get_admin_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Vincula os contadores aos Canais 0 e 1 do módulo físico IoT.
+    Atualiza a BD e envia imediatamente a configuração via MQTT para o ESP32.
+    """
+    device = db.query(DispositivoIoT).filter(DispositivoIoT.id == device_id).first()
+    if not device:
+        raise HTTPException(status_code=404, detail="Módulo IoT não encontrado")
+
+    contador_c0 = db.query(Contador).filter(Contador.numero_serie == data.meter_serial_c0).first()
+    if not contador_c0:
+        raise HTTPException(
+            status_code=404, 
+            detail=f"Contador com série '{data.meter_serial_c0}' não existe no sistema"
+        )
+
+    contador_c1 = db.query(Contador).filter(Contador.numero_serie == data.meter_serial_c1).first()
+    if not contador_c1:
+        raise HTTPException(
+            status_code=404, 
+            detail=f"Contador com série '{data.meter_serial_c1}' não existe no sistema"
+        )
+
+    db.query(Contador).filter(Contador.dispositivo_id == device.id).update(
+        {"dispositivo_id": None, "canal": 0}
+    )
+
+    contador_c0.dispositivo_id = device.id
+    contador_c0.canal = 0
+
+    contador_c1.dispositivo_id = device.id
+    contador_c1.canal = 1
+
+    device.estado = "ACTIVE"
+    db.commit()
+
+    config_payload = {
+        "meter_serial_c0": contador_c0.numero_serie,
+        "meter_serial_c1": contador_c1.numero_serie,
+    }
+    config_topic = f"gezi/v1/{device.mac_address}/config"
+    mqtt_client.publish(config_topic, json.dumps(config_payload), qos=1)
+
+    logger.info(
+        f"Admin: Dispositivo {device.mac_address} vinculado a C0={contador_c0.numero_serie}, C1={contador_c1.numero_serie}"
+    )
+
+    return {
+        "success": True,
+        "message": "Contadores vinculados com sucesso e configuração enviada ao dispositivo.",
+        "data": {
+            "mac_address": device.mac_address,
+            "meter_serial_c0": contador_c0.numero_serie,
+            "meter_serial_c1": contador_c1.numero_serie,
+        }
+    }

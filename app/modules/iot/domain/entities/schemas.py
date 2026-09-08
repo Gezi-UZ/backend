@@ -55,7 +55,31 @@ class IoTAdminDeviceResponse(BaseModel):
     class Config:
         from_attributes = True
 
+from pydantic import BaseModel, Field, field_validator
+
 class IoTAdminDeviceListResponse(BaseModel):
     devices: list[IoTAdminDeviceResponse]
     total: int
+
+class BindMetersRequest(BaseModel):
+    meter_serial_c0: str = Field(..., description="Serial decimal do Canal 0 (até 11 dígitos)")
+    meter_serial_c1: str = Field(..., description="Serial decimal do Canal 1 (até 11 dígitos)")
+
+    @field_validator("meter_serial_c0", "meter_serial_c1")
+    @classmethod
+    def validate_meter_serial(cls, v: str) -> str:
+        s = v.strip()
+        if not s.isdigit():
+            raise ValueError("O número de série deve conter apenas dígitos numéricos.")
+        if len(s) > 11:
+            raise ValueError("O número de série não pode exceder 11 dígitos.")
+        return s
+
+    @field_validator("meter_serial_c1")
+    @classmethod
+    def validate_different_serials(cls, v: str, info) -> str:
+        c0 = info.data.get("meter_serial_c0")
+        if c0 and v.strip() == c0.strip():
+            raise ValueError("Os contadores dos canais 0 e 1 devem ser distintos.")
+        return v
 

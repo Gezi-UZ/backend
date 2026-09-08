@@ -9,29 +9,24 @@ class SQLAlchemyIoTRepository:
         self.db = db
 
     def get_all_devices(self, skip: int = 0, limit: int = 100) -> tuple[List[dict], int]:
-        query = (
-            self.db.query(
-                DispositivoIoT,
-                Contador.id.label("meter_id"),
-                Contador.numero_serie.label("meter_serial")
-            )
-            .outerjoin(Contador, DispositivoIoT.id == Contador.dispositivo_id)
-        )
+        query = self.db.query(DispositivoIoT)
         
         total = query.count()
         results = query.offset(skip).limit(limit).all()
         
         formatted = []
-        for r in results:
-            device = r.DispositivoIoT
+        for device in results:
+            serials = [c.numero_serie for c in device.contadores if c.numero_serie]
+            meter_serial = " | ".join(serials) if serials else None
+            
             formatted.append({
                 "id": device.id,
                 "mac_address": device.mac_address,
                 "firmware_version": device.firmware_version,
                 "estado": device.estado,
                 "ultimo_heartbeat": device.ultimo_heartbeat,
-                "meter_id": r.meter_id,
-                "meter_serial": r.meter_serial
+                "meter_id": None,
+                "meter_serial": meter_serial
             })
             
         return formatted, total

@@ -6,7 +6,7 @@ from datetime import datetime
 class MeterLocation(BaseModel):
     latitude: float
     longitude: float
-    address: str
+    address: Optional[str] = None
 
 class MeterCreate(BaseModel):
     serial_number: str
@@ -25,7 +25,7 @@ class AdminMeterCreate(MeterCreate):
 
 class MeterResponse(BaseModel):
     meter_id: uuid.UUID = Field(alias="id") # The docs use 'meter_id' but DB has 'id'
-    serial_number: str
+    serial_number: str = Field(validation_alias="numero_serie")
     label: Optional[str]
     location: Optional[MeterLocation]
     status: str = Field(alias="estado")
