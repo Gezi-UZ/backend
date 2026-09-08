@@ -5,6 +5,8 @@ Topicos:
   - credelec/meter/{serial}/cmd         → Backend publica comandos para o ESP32
   - credelec/meter/{serial}/telemetry   → ESP32 publica dados de telemetria
   - credelec/meter/{serial}/ack         → ESP32 confirma que aplicou um comando
+  - gezi/v1/{mac}/hello                 → ESP32 anuncia presenca (auto-discovery)
+  - gezi/v1/{mac}/config                → Backend envia seriais dos contadores para o ESP32
 """
 import json
 import ssl
@@ -149,12 +151,14 @@ def _handle_ack(serial: str, payload: dict):
 
 def _handle_hello(mac_address: str, payload: dict):
     """
-    Auto-discovery: Regista o Modulo IoT quando este se liga pela primeira vez.
+    Auto-discovery: Regista o Modulo IoT quando este se liga pela primeira vez,
+    e envia a configuracao dos contadores associados de volta para o ESP32.
     """
     def _process():
         try:
             from app.core.database import SessionLocal
             from app.modules.iot.domain.entities.iot import DispositivoIoT
+            from app.modules.meters.domain.entities.meter import Contador
             
             db = SessionLocal()
             try:
@@ -180,6 +184,20 @@ def _handle_hello(mac_address: str, payload: dict):
                     dispositivo.ultimo_heartbeat = datetime.utcnow()
                     db.commit()
                     logger.info(f"MQTT: Modulo IoT {mac_address} reconectado")
+
+                # Procurar contadores vinculados a este dispositivo físico
+                contadores = db.query(Contador).filter(Contador.dispositivo_id == dispositivo.id).all()
+                c0 = next((c.numero_serie for c in contadores if c.canal == 0), None)
+                c1 = next((c.numero_serie for c in contadores if c.canal == 1), None)
+
+                if c0 or c1:
+                    config_payload = {
+                        "meter_serial_c0": c0 or "",
+                        "meter_serial_c1": c1 or ""
+                    }
+                    config_topic = f"gezi/v1/{mac_address}/config"
+                    mqtt_client.publish(config_topic, json.dumps(config_payload), qos=1)
+                    logger.info(f"MQTT: Configuração de seriais enviada para {mac_address}: {config_payload}")
             finally:
                 db.close()
         except Exception as e:
