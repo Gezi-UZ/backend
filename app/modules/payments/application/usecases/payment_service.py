@@ -41,9 +41,9 @@ class InitiatePaymentUseCase:
         amount: float,
         phone: str,
     ) -> Pagamento:
-        # Gera referência única sem espaços (GEZI-<8 chars do uuid>)
+        # Gera referência única sem espaços e sem hífens para Mpesa (ex: GEZIA1B2C3D4)
         short_id = str(recharge_id).replace("-", "")[:8].upper()
-        reference = f"GEZI-{short_id}"
+        reference = f"GEZI{short_id}"
 
         # Cria registo na BD
         pagamento = Pagamento(
@@ -119,7 +119,7 @@ class ReconcilePaymentsUseCase:
             ref = payment_status.reference
 
             # Só interessa referências geradas pelo Gezi
-            if not ref.startswith("GEZI-"):
+            if not ref.startswith("GEZI"):
                 continue
 
             # Verificar se já está confirmado localmente

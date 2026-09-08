@@ -15,6 +15,20 @@ class IRechargeRepository(ABC):
         ...
 
     @abstractmethod
+    def create_with_breakdown(
+        self,
+        user_id: uuid.UUID,
+        meter_id: uuid.UUID,
+        montante: float,
+        breakdown_data: dict,
+        metodo: str = "M-PESA",
+        is_primeira_compra: bool = False,
+        token: Optional[str] = None,
+    ) -> Recarga:
+        """Cria recarga + desdobramento numa única transacção."""
+        ...
+
+    @abstractmethod
     def get_by_id(self, recharge_id: uuid.UUID) -> Optional[Recarga]:
         """Devolve uma recarga pelo seu ID."""
         ...

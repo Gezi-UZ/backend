@@ -88,6 +88,7 @@ class InitiateRechargeUseCase:
 
         # 4. Criar recarga com estado PENDING
         recharge = self.recharge_repo.create_with_breakdown(
+            user_id=user_id,
             meter_id=data.meter_id,
             montante=data.amount_mzn,
             breakdown_data=breakdown,

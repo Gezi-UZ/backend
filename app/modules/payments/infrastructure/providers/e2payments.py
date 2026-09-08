@@ -124,7 +124,7 @@ class E2PaymentsProvider(IPaymentGateway):
         )
 
         try:
-            async with httpx.AsyncClient(timeout=15.0) as client:
+            async with httpx.AsyncClient(timeout=60.0) as client:
                 headers = await self._auth_headers()
                 response = await client.post(endpoint, json=payload, headers=headers)
 

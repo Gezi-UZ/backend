@@ -30,6 +30,7 @@ class SQLAlchemyRechargeRepository(IRechargeRepository):
 
     def create_with_breakdown(
         self,
+        user_id: uuid.UUID,
         meter_id: uuid.UUID,
         montante: float,
         breakdown_data: dict,
@@ -40,6 +41,7 @@ class SQLAlchemyRechargeRepository(IRechargeRepository):
         """Cria recarga + desdobramento numa única transacção."""
         db_recharge = Recarga(
             contador_id=meter_id,
+            utilizador_id=user_id,
             montante_pago=montante,
             kwh_creditado=breakdown_data["kwh_calculado"],
             metodo=metodo,
