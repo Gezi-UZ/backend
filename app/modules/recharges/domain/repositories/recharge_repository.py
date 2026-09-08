@@ -62,6 +62,11 @@ class IRechargeRepository(ABC):
         ...
 
     @abstractmethod
+    def mark_token_used(self, recharge_id: uuid.UUID, applied_at: datetime) -> Optional[Recarga]:
+        """Marca o token como utilizado."""
+        ...
+
+    @abstractmethod
     def get_dashboard_stats(
         self,
         user_id: uuid.UUID,

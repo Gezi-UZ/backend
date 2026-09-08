@@ -182,6 +182,16 @@ class SQLAlchemyRechargeRepository(IRechargeRepository):
             self.db.refresh(db_recharge)
         return db_recharge
 
+    def mark_token_used(self, recharge_id: uuid.UUID, applied_at: datetime) -> Optional[Recarga]:
+        db_recharge = self.get_by_id(recharge_id)
+        if db_recharge:
+            db_recharge.token_sts_usado = True
+            db_recharge.recarregado_em = applied_at
+            db_recharge.estado = "MQTT_SENT"
+            self.db.commit()
+            self.db.refresh(db_recharge)
+        return db_recharge
+
     def get_dashboard_stats(
         self,
         user_id: uuid.UUID,

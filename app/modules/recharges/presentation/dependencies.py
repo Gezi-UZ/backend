@@ -63,3 +63,10 @@ def get_list_admin_transactions_usecase(
     recharge_repo: SQLAlchemyRechargeRepository = Depends(get_recharge_repository)
 ):
     return ListAdminTransactionsUseCase(recharge_repo)
+
+def get_admin_generate_token_usecase(
+    recharge_repo: SQLAlchemyRechargeRepository = Depends(get_recharge_repository),
+    meter_repo: SQLAlchemyMeterRepository = Depends(get_meter_repository),
+):
+    from app.modules.recharges.application.usecases.admin_generate_token import AdminGenerateTokenUseCase
+    return AdminGenerateTokenUseCase(recharge_repo, meter_repo)

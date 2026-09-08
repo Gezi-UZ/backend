@@ -13,7 +13,12 @@ from app.modules.meters.application.usecases.list_all_meters_detailed import Lis
 from app.modules.meters.application.usecases.admin_update_meter import AdminUpdateMeterUseCase
 from app.modules.meters.application.usecases.admin_create_meter import AdminCreateMeterUseCase
 from app.modules.meters.domain.entities.schemas import AdminMeterCreate
+from app.modules.recharges.presentation.dependencies import get_admin_generate_token_usecase
 import uuid
+from pydantic import BaseModel
+
+class GenerateTokenRequest(BaseModel):
+    amount: float
 
 router = APIRouter()
 
@@ -83,5 +88,23 @@ def admin_revoke_meter_owner(
     return {
         "success": True,
         "data": meter.model_dump(by_alias=True)
+    }
+
+@router.post("/meters/{meter_id}/generate-token")
+def admin_generate_token(
+    meter_id: uuid.UUID,
+    data: GenerateTokenRequest,
+    admin_user: AuthUser = Depends(get_admin_user),
+    usecase: Any = Depends(get_admin_generate_token_usecase)
+) -> Dict[str, Any]:
+    """
+    Admin endpoint to simulate generation of an STS code for a meter via 3rd party (like top-up).
+    """
+    token = usecase.execute(meter_id, amount=data.amount)
+    return {
+        "success": True,
+        "data": {
+            "token": token
+        }
     }
 

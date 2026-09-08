@@ -20,7 +20,6 @@ class RechargeInitiateRequest(BaseModel):
 
 
 class ManualCodeRequest(BaseModel):
-    meter_id: uuid.UUID
     recharge_code: str = Field(..., min_length=1, description="Código CREDELEC obtido por canal externo")
 
 
@@ -92,7 +91,8 @@ class RechargeDashboardResponse(BaseModel):
 class ManualCodeResponse(BaseModel):
     recharge_id: uuid.UUID
     status: str
-    credit_kwh: Optional[float] = None
+    credit_kwh: float
+    meter_number: str
 
 class AdminTransactionResponse(BaseModel):
     recharge_id: uuid.UUID

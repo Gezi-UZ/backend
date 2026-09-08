@@ -35,49 +35,36 @@ class ApplyManualCodeUseCase:
                 detail="Código inválido. Formato esperado: XXXX-XXXX-XXXX-XXXX (apenas dígitos)."
             )
 
-        # 2. Verificar uso único (RN10) — 409 se já utilizado
-        existing = self.recharge_repo.get_by_meter_and_code(data.recharge_code)
-        if existing:
+        # 2. Procurar a recarga associada a este código STS
+        existing_recharge = self.recharge_repo.get_by_meter_and_code(data.recharge_code)
+        if not existing_recharge:
+            raise HTTPException(
+                status_code=404,
+                detail="Código de recarga não encontrado."
+            )
+
+        # 3. Verificar uso único (RN10) — 409 se já utilizado
+        if existing_recharge.token_sts_usado:
             raise HTTPException(
                 status_code=409,
                 detail="Este código já foi utilizado anteriormente (RN10)."
             )
 
-        # 3. Verificar que o contador pertence ao utilizador (RN09)
-        meter = self.meter_repo.get_by_id(data.meter_id)
-        if not meter:
-            raise HTTPException(status_code=404, detail="Contador não encontrado.")
-        if meter.utilizador_id != user_id:
+        # 4. Verificar que o contador pertence ao utilizador (RN09)
+        meter = existing_recharge.contador
+        if not meter or meter.utilizador_id != user_id:
             raise HTTPException(
                 status_code=403,
-                detail="Contador não pertence ao utilizador autenticado."
+                detail="Este código não pertence a nenhum dos seus contadores."
             )
 
-        # 4. Calcular kWh estimado (usando valor de referência — código externo não tem montante associado)
-        # Para códigos manuais, usamos o kwh_creditado do token (fixo por tipo de código)
-        # Em produção, o backend consultaria a API CREDELEC para obter o valor em kWh
-        # Por agora, usamos um cálculo baseado num montante padrão de 200 MZN
-        MONTANTE_PADRAO = 200.0
-        breakdown = calcular_desdobramento(montante_total=MONTANTE_PADRAO)
-        credit_kwh = breakdown["kwh_calculado"]
-
-        # 5. Criar registo da recarga com o token e enviá-la directamente para MQTT_SENT
-        recharge = self.recharge_repo.create_with_breakdown(
-            meter_id=data.meter_id,
-            montante=MONTANTE_PADRAO,
-            breakdown_data=breakdown,
-            metodo="MANUAL_CODE",
-        )
-
-        # 6. Gravar o token no registo (marcando como já utilizado — RN10)
+        # 5. Marcar token como usado e actualizar estado para MQTT_SENT
         now = datetime.now(timezone.utc)
-        recharge = self.recharge_repo.update_token(recharge.id, data.recharge_code, now)
-
-        # Actualizar estado para MQTT_SENT (o código será publicado via MQTT pelo caller)
-        recharge = self.recharge_repo.update_status(recharge.id, "MQTT_SENT")
+        updated_recharge = self.recharge_repo.mark_token_used(existing_recharge.id, now)
 
         return ManualCodeResponse(
-            recharge_id=recharge.id,
-            status=recharge.estado,
-            credit_kwh=credit_kwh,
+            recharge_id=updated_recharge.id,
+            status=updated_recharge.estado,
+            credit_kwh=updated_recharge.kwh_creditado or 0.0,
+            meter_number=meter.numero_serie,
         )
