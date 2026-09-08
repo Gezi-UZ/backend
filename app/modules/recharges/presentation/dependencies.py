@@ -13,6 +13,8 @@ from app.modules.recharges.application.usecases.recharge_service import (
 from app.modules.recharges.application.usecases.manual_code import ApplyManualCodeUseCase
 
 from app.modules.recharges.application.usecases.admin_transactions import ListAdminTransactionsUseCase
+from app.modules.audit.presentation.dependencies import get_create_audit_log_usecase
+from app.modules.audit.application.usecases.create_audit_log import CreateAuditLogUseCase
 
 
 def get_recharge_repository(db: Session = Depends(get_db)):
@@ -27,8 +29,9 @@ def get_initiate_recharge_usecase(
     recharge_repo: SQLAlchemyRechargeRepository = Depends(get_recharge_repository),
     meter_repo: SQLAlchemyMeterRepository = Depends(get_meter_repository),
     db: Session = Depends(get_db),
+    audit_usecase: CreateAuditLogUseCase = Depends(get_create_audit_log_usecase),
 ):
-    return InitiateRechargeUseCase(recharge_repo, meter_repo, db)
+    return InitiateRechargeUseCase(recharge_repo, meter_repo, db, audit_usecase)
 
 
 def get_recharge_status_usecase(

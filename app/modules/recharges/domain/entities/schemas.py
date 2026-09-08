@@ -56,10 +56,15 @@ class RechargeStatusResponse(BaseModel):
 class RechargeHistoryItem(BaseModel):
     recharge_id: uuid.UUID
     meter_id: uuid.UUID
+    meter_serial_number: Optional[str] = None
     amount_mzn: float
     credit_kwh: Optional[float] = None
     status: str
     created_at: datetime = Field(validation_alias="criado_em")
+    payment_method: str = "M-Pesa"
+    referencia_mpesa: Optional[str] = None
+    recharge_type: str = "SELF"  # SELF, FOR_OTHER, RECEIVED
+    other_party_name: Optional[str] = None
 
     class Config:
         from_attributes = True

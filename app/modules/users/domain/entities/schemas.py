@@ -3,7 +3,7 @@ import uuid
 from datetime import datetime
 
 class UserBase(BaseModel):
-    telefone: str
+    telefone: str | None = None
     nome: str
     papel: str = "cliente"
     biometria_activa: bool = False

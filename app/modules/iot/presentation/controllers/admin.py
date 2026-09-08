@@ -16,6 +16,7 @@ import uuid
 import logging
 import json
 from app.core.mqtt import mqtt_client
+from app.modules.audit.presentation.dependencies import log_admin_action
 
 logger = logging.getLogger(__name__)
 
@@ -143,6 +144,15 @@ def bind_meters_to_device(
 
     logger.info(
         f"Admin: Dispositivo {device.mac_address} vinculado a C0={contador_c0.numero_serie}, C1={contador_c1.numero_serie}"
+    )
+
+    log_admin_action(
+        db=db,
+        admin_id=admin_user.id,
+        accao="VINCULAR_DISPOSITIVO_IOT",
+        entidade="dispositivo_iot",
+        entidade_id=str(device.id),
+        detalhes=f"Vinculado a C0={contador_c0.numero_serie} e C1={contador_c1.numero_serie}"
     )
 
     return {

@@ -11,6 +11,8 @@ from app.modules.meters.application.usecases.list_all_meters import ListAllMeter
 from app.modules.meters.application.usecases.list_all_meters_detailed import ListAllMetersDetailedUseCase
 from app.modules.meters.application.usecases.admin_update_meter import AdminUpdateMeterUseCase
 from app.modules.meters.application.usecases.admin_create_meter import AdminCreateMeterUseCase
+from app.modules.audit.presentation.dependencies import get_create_audit_log_usecase
+from app.modules.audit.application.usecases.create_audit_log import CreateAuditLogUseCase
 
 def get_meter_repository(db: Session = Depends(get_db)):
     return SQLAlchemyMeterRepository(db)
@@ -36,8 +38,18 @@ def get_list_all_meters_usecase(repo: SQLAlchemyMeterRepository = Depends(get_me
 def get_list_all_meters_detailed_usecase(repo: SQLAlchemyMeterRepository = Depends(get_meter_repository)):
     return ListAllMetersDetailedUseCase(repo)
 
-def get_admin_update_meter_usecase(repo: SQLAlchemyMeterRepository = Depends(get_meter_repository)):
-    return AdminUpdateMeterUseCase(repo)
+def get_admin_update_meter_usecase(
+    repo: SQLAlchemyMeterRepository = Depends(get_meter_repository),
+    audit_usecase: CreateAuditLogUseCase = Depends(get_create_audit_log_usecase)
+):
+    return AdminUpdateMeterUseCase(repo, audit_usecase)
 
 def get_admin_create_meter_usecase(repo: SQLAlchemyMeterRepository = Depends(get_meter_repository)):
     return AdminCreateMeterUseCase(repo)
+
+def get_revoke_meter_access_usecase(
+    repo: SQLAlchemyMeterRepository = Depends(get_meter_repository),
+    audit_usecase: CreateAuditLogUseCase = Depends(get_create_audit_log_usecase)
+):
+    from app.modules.meters.application.usecases.revoke_meter_access import RevokeMeterAccessUseCase
+    return RevokeMeterAccessUseCase(repo, audit_usecase)

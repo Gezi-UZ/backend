@@ -28,3 +28,7 @@ class IMeterRepository(ABC):
     @abstractmethod
     def get_all(self, status: Optional[str] = None, skip: int = 0, limit: int = 100) -> List[Contador]:
         pass
+
+    @abstractmethod
+    def revoke_owner(self, meter_id: uuid.UUID) -> Optional[Contador]:
+        pass

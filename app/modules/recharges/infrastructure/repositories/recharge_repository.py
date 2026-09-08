@@ -86,10 +86,17 @@ class SQLAlchemyRechargeRepository(IRechargeRepository):
         skip: int = 0,
         limit: int = 20,
     ) -> tuple[List[Recarga], int]:
+        from sqlalchemy.orm import contains_eager, selectinload
+        from sqlalchemy import or_
         query = (
             self.db.query(Recarga)
             .join(Contador, Recarga.contador_id == Contador.id)
-            .filter(Contador.utilizador_id == user_id)
+            .options(
+                contains_eager(Recarga.contador).selectinload(Contador.utilizador), 
+                selectinload(Recarga.pagamentos),
+                selectinload(Recarga.utilizador)
+            )
+            .filter(or_(Contador.utilizador_id == user_id, Recarga.utilizador_id == user_id))
         )
         if meter_id:
             query = query.filter(Recarga.contador_id == meter_id)
@@ -182,10 +189,14 @@ class SQLAlchemyRechargeRepository(IRechargeRepository):
         from_date: Optional[datetime] = None,
         to_date: Optional[datetime] = None,
     ) -> dict:
+        from sqlalchemy import or_
+        from sqlalchemy.orm import contains_eager
+        
         query = (
             self.db.query(Recarga)
             .join(Contador, Recarga.contador_id == Contador.id)
-            .filter(Contador.utilizador_id == user_id)
+            .options(contains_eager(Recarga.contador))
+            .filter(or_(Contador.utilizador_id == user_id, Recarga.utilizador_id == user_id))
             .filter(Recarga.estado.in_(["CONFIRMED", "MQTT_SENT", "ACK_RECEIVED", "COMPLETED"]))
         )
         if meter_id:
@@ -196,8 +207,9 @@ class SQLAlchemyRechargeRepository(IRechargeRepository):
             query = query.filter(Recarga.criado_em <= to_date)
 
         recharges = query.all()
-        total_spent = sum(r.montante_pago for r in recharges)
-        total_kwh = sum(r.kwh_creditado or 0.0 for r in recharges)
+        
+        total_spent = sum(r.montante_pago for r in recharges if r.utilizador_id == user_id)
+        total_kwh = sum(r.kwh_creditado or 0.0 for r in recharges if r.contador.utilizador_id == user_id)
         count = len(recharges)
 
         # Calcular média diária de consumo

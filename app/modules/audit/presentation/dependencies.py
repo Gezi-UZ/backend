@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.modules.audit.infrastructure.repositories.audit_repository import SQLAlchemyAuditRepository
 from app.modules.audit.application.usecases.list_audit_logs import ListAuditLogsUseCase
+from app.modules.audit.application.usecases.create_audit_log import CreateAuditLogUseCase
 import uuid
 from typing import Optional
 
@@ -11,6 +12,9 @@ def get_audit_repository(db: Session = Depends(get_db)):
 
 def get_list_audit_logs_usecase(repo: SQLAlchemyAuditRepository = Depends(get_audit_repository)):
     return ListAuditLogsUseCase(repo)
+
+def get_create_audit_log_usecase(repo: SQLAlchemyAuditRepository = Depends(get_audit_repository)):
+    return CreateAuditLogUseCase(repo)
 
 def log_admin_action(
     db: Session,

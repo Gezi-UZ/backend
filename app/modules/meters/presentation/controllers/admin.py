@@ -6,7 +6,8 @@ from app.modules.meters.domain.entities.schemas import MeterResponse, AdminMeter
 from app.modules.meters.presentation.dependencies import (
     get_list_all_meters_detailed_usecase, 
     get_admin_update_meter_usecase,
-    get_admin_create_meter_usecase
+    get_admin_create_meter_usecase,
+    get_revoke_meter_access_usecase
 )
 from app.modules.meters.application.usecases.list_all_meters_detailed import ListAllMetersDetailedUseCase
 from app.modules.meters.application.usecases.admin_update_meter import AdminUpdateMeterUseCase
@@ -63,8 +64,24 @@ def admin_update_meter(
     """
     Admin endpoint to update any meter's details.
     """
-    meter = usecase.execute(meter_id, update_data)
+    meter = usecase.execute(meter_id, update_data, admin_id=admin_user.id)
     return {
         "success": True,
         "data": meter.model_dump(by_alias=True)
     }
+
+@router.post("/meters/{meter_id}/revoke-owner")
+def admin_revoke_meter_owner(
+    meter_id: uuid.UUID,
+    admin_user: AuthUser = Depends(get_admin_user),
+    usecase: Any = Depends(get_revoke_meter_access_usecase)
+) -> Dict[str, Any]:
+    """
+    Admin endpoint to revoke the current owner of a meter.
+    """
+    meter = usecase.execute(meter_id, admin_id=admin_user.id)
+    return {
+        "success": True,
+        "data": meter.model_dump(by_alias=True)
+    }
+

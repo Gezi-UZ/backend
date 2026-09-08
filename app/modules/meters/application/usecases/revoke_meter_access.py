@@ -1,16 +1,16 @@
 from app.modules.meters.infrastructure.repositories.meter_repository import SQLAlchemyMeterRepository
-from app.modules.meters.domain.entities.schemas import MeterUpdate, MeterResponse
+from app.modules.meters.domain.entities.schemas import MeterResponse
 import uuid
-from typing import Optional
 from fastapi import HTTPException, status
+from typing import Optional
 from app.modules.audit.application.usecases.create_audit_log import CreateAuditLogUseCase
 
-class AdminUpdateMeterUseCase:
+class RevokeMeterAccessUseCase:
     def __init__(self, meter_repo: SQLAlchemyMeterRepository, audit_usecase: CreateAuditLogUseCase):
         self.meter_repo = meter_repo
         self.audit_usecase = audit_usecase
 
-    def execute(self, meter_id: uuid.UUID, update_data: MeterUpdate, admin_id: Optional[uuid.UUID] = None) -> MeterResponse:
+    def execute(self, meter_id: uuid.UUID, admin_id: Optional[uuid.UUID] = None) -> MeterResponse:
         meter = self.meter_repo.get_by_id(meter_id)
         if not meter:
             raise HTTPException(
@@ -18,14 +18,13 @@ class AdminUpdateMeterUseCase:
                 detail="Meter not found"
             )
             
-        updated_meter = self.meter_repo.update(meter_id, update_data)
+        updated_meter = self.meter_repo.revoke_owner(meter_id)
         
         self.audit_usecase.execute(
-            accao="EDITAR_CONTADOR",
+            accao="REVOGAR_ACESSO_CONTADOR",
             entidade="contador",
             entidade_id=str(meter_id),
-            admin_id=admin_id,
-            detalhes=update_data.model_dump_json(exclude_unset=True)
+            admin_id=admin_id
         )
         
         return MeterResponse.model_validate(updated_meter)

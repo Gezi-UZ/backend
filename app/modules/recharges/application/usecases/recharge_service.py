@@ -15,6 +15,8 @@ from typing import Optional
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
+from app.modules.audit.application.usecases.create_audit_log import CreateAuditLogUseCase
+
 from app.modules.recharges.domain.repositories.recharge_repository import IRechargeRepository
 from app.modules.meters.domain.repositories.meter_repository import IMeterRepository
 from app.modules.recharges.domain.entities.schemas import (
@@ -54,10 +56,12 @@ class InitiateRechargeUseCase:
         recharge_repo: IRechargeRepository,
         meter_repo: IMeterRepository,
         db: Session,
+        audit_usecase: CreateAuditLogUseCase,
     ):
         self.recharge_repo = recharge_repo
         self.meter_repo = meter_repo
         self.db = db
+        self.audit_usecase = audit_usecase
 
     async def execute(
         self, user_id: uuid.UUID, data: RechargeInitiateRequest
@@ -114,6 +118,15 @@ class InitiateRechargeUseCase:
                 f"Recarga {recharge.id}: Sem telefone disponível para STK Push. "
                 "Aguardando reconciliação manual ou callback."
             )
+
+        # 7. Auditar a acção do cliente
+        self.audit_usecase.execute(
+            accao="RECARGA_CONTADOR",
+            entidade="contador",
+            entidade_id=str(data.meter_id),
+            admin_id=None,
+            detalhes=f"Utilizador {user_id} iniciou recarga de {data.amount_mzn} MZN. Recharge ID: {recharge.id}"
+        )
 
         return RechargeInitiateResponse(
             recharge_id=recharge.id,
@@ -230,17 +243,38 @@ class GetRechargeHistoryUseCase:
             limit=page_size,
         )
 
-        items = [
-            RechargeHistoryItem(
-                recharge_id=r.id,
-                meter_id=r.contador_id,
-                amount_mzn=r.montante_pago,
-                credit_kwh=r.kwh_creditado,
-                status=r.estado,
-                created_at=r.criado_em,
+        items = []
+        for r in recharges:
+            referencia = None
+            if r.pagamentos:
+                # Obter a referência do pagamento bem-sucedido ou do último registado
+                pag = next((p for p in r.pagamentos if p.estado == 'SUCCESS'), r.pagamentos[-1])
+                referencia = pag.referencia_mpesa
+
+            recharge_type = "SELF"
+            other_party_name = None
+            if r.utilizador_id == user_id and r.contador.utilizador_id != user_id:
+                recharge_type = "FOR_OTHER"
+                other_party_name = r.contador.utilizador.nome if (r.contador and r.contador.utilizador) else (r.contador.label if r.contador else None)
+            elif r.utilizador_id != user_id and r.contador.utilizador_id == user_id:
+                recharge_type = "RECEIVED"
+                other_party_name = r.utilizador.nome if r.utilizador else "Unknown"
+
+            items.append(
+                RechargeHistoryItem(
+                    recharge_id=r.id,
+                    meter_id=r.contador_id,
+                    meter_serial_number=r.contador.numero_serie if r.contador else None,
+                    amount_mzn=r.montante_pago,
+                    credit_kwh=r.kwh_creditado,
+                    status=r.estado,
+                    created_at=r.criado_em,
+                    payment_method=r.metodo,
+                    referencia_mpesa=referencia,
+                    recharge_type=recharge_type,
+                    other_party_name=other_party_name,
+                )
             )
-            for r in recharges
-        ]
 
         return RechargeHistoryResponse(
             recharges=items,

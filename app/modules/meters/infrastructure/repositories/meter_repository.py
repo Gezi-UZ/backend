@@ -55,6 +55,14 @@ class SQLAlchemyMeterRepository(IMeterRepository):
             self.db.refresh(db_meter)
         return db_meter
 
+    def revoke_owner(self, meter_id: uuid.UUID) -> Optional[Contador]:
+        db_meter = self.get_by_id(meter_id)
+        if db_meter:
+            db_meter.utilizador_id = None
+            self.db.commit()
+            self.db.refresh(db_meter)
+        return db_meter
+
     def get_all(self, status: Optional[str] = None, skip: int = 0, limit: int = 100) -> List[Contador]:
         query = self.db.query(Contador)
         if status:
