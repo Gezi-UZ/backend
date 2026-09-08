@@ -26,7 +26,8 @@ class SQLAlchemyMeterRepository(IMeterRepository):
             longitude=meter.location.longitude,
             address=meter.location.address,
             utilizador_id=user_id,
-            estado="PENDING_ACTIVATION"
+            estado="PENDING_ACTIVATION",
+            canal=getattr(meter, "canal", 0) or 0
         )
         self.db.add(db_meter)
         self.db.commit()
@@ -42,6 +43,8 @@ class SQLAlchemyMeterRepository(IMeterRepository):
                 db_meter.latitude = meter_update.location.latitude
                 db_meter.longitude = meter_update.location.longitude
                 db_meter.address = meter_update.location.address
+            if getattr(meter_update, "canal", None) is not None:
+                db_meter.canal = meter_update.canal
             # Allow resetting owner if explicitly provided (e.g. some constant) but typically None means don't update.
             # To set owner_id, we check if it is part of the request.
             # Actually, Pydantic's exclude_unset is better, but here we just check if it's set. 
@@ -102,7 +105,8 @@ class SQLAlchemyMeterRepository(IMeterRepository):
                 "owner_phone": r.owner_phone,
                 "device_mac": r.device_mac,
                 "firmware_version": r.firmware_version,
-                "last_seen_at": r.last_seen_at
+                "last_seen_at": r.last_seen_at,
+                "canal": getattr(meter, "canal", 0) or 0
             }
             formatted.append(item)
             

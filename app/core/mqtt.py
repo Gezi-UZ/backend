@@ -52,7 +52,8 @@ def on_connect(client, userdata, flags, reason_code, properties):
         # Isso garante que apenas 1 worker processa cada mensagem, evitando duplicados.
         client.subscribe("$share/gezi_group/credelec/meter/+/telemetry", qos=1)
         client.subscribe("$share/gezi_group/credelec/meter/+/ack", qos=1)
-        logger.info("MQTT: Subscrito a $share/gezi_group/credelec/meter/+/telemetry e ack")
+        client.subscribe("$share/gezi_group/gezi/v1/+/hello", qos=1)
+        logger.info("MQTT: Subscrito a topicos de telemetria, ack e hello")
     else:
         logger.error(f"MQTT: Falha ao conectar ao broker, reason_code={reason_code}")
 
@@ -68,26 +69,32 @@ def on_message(client, userdata, msg):
     """
     topic = msg.topic
     try:
-        payload = json.loads(msg.payload.decode("utf-8"))
+        payload = json.loads(msg.payload.decode("utf-8")) if msg.payload else {}
     except (json.JSONDecodeError, UnicodeDecodeError) as e:
         logger.error(f"MQTT: Payload invalido no topico '{topic}': {e}")
         return
 
-    # Extrair o serial do topico: credelec/meter/{serial}/telemetry
     parts = topic.split("/")
-    if len(parts) != 4 or parts[0] != "credelec" or parts[1] != "meter":
-        logger.warning(f"MQTT: Topico desconhecido: {topic}")
+    
+    # Rota para hello (Auto-discovery do ESP32)
+    if len(parts) == 4 and parts[0] == "gezi" and parts[1] == "v1" and parts[3] == "hello":
+        mac_address = parts[2]
+        _handle_hello(mac_address, payload)
         return
 
-    serial = parts[2]
-    msg_type = parts[3]
+    # Rota para telemetria/ack (baseado no serial do contador)
+    if len(parts) == 4 and parts[0] == "credelec" and parts[1] == "meter":
+        serial = parts[2]
+        msg_type = parts[3]
 
-    if msg_type == "telemetry":
-        _handle_telemetry(serial, payload)
-    elif msg_type == "ack":
-        _handle_ack(serial, payload)
+        if msg_type == "telemetry":
+            _handle_telemetry(serial, payload)
+        elif msg_type == "ack":
+            _handle_ack(serial, payload)
+        else:
+            logger.warning(f"MQTT: Tipo de mensagem desconhecido: {msg_type}")
     else:
-        logger.warning(f"MQTT: Tipo de mensagem desconhecido: {msg_type}")
+        logger.warning(f"MQTT: Topico desconhecido ou mal formatado: {topic}")
 
 
 # ─── Handlers (executados em background thread) ──────────────────────────────
@@ -139,6 +146,47 @@ def _handle_ack(serial: str, payload: dict):
     thread = threading.Thread(target=_process, daemon=True)
     thread.start()
 
+
+def _handle_hello(mac_address: str, payload: dict):
+    """
+    Auto-discovery: Regista o Modulo IoT quando este se liga pela primeira vez.
+    """
+    def _process():
+        try:
+            from app.core.database import SessionLocal
+            from app.modules.iot.domain.entities.iot import DispositivoIoT
+            
+            db = SessionLocal()
+            try:
+                # Verifica se o dispositivo ja existe
+                dispositivo = db.query(DispositivoIoT).filter(DispositivoIoT.mac_address == mac_address).first()
+                if not dispositivo:
+                    # Regista novo dispositivo
+                    import uuid
+                    dispositivo = DispositivoIoT(
+                        id=uuid.uuid4(),
+                        mac_address=mac_address,
+                        firmware_version=payload.get("firmware", "unknown"),
+                        estado="FACTORY",
+                    )
+                    db.add(dispositivo)
+                    db.commit()
+                    logger.info(f"MQTT: Novo Modulo IoT auto-registado: {mac_address}")
+                else:
+                    # Atualiza firmware e ultimo ping se ja existir
+                    if "firmware" in payload:
+                        dispositivo.firmware_version = payload["firmware"]
+                    from datetime import datetime
+                    dispositivo.ultimo_heartbeat = datetime.utcnow()
+                    db.commit()
+                    logger.info(f"MQTT: Modulo IoT {mac_address} reconectado")
+            finally:
+                db.close()
+        except Exception as e:
+            logger.error(f"MQTT: Erro ao processar hello de {mac_address}: {e}")
+
+    thread = threading.Thread(target=_process, daemon=True)
+    thread.start()
 
 # Registar callbacks
 mqtt_client.on_connect = on_connect

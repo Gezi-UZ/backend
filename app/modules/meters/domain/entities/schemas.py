@@ -12,11 +12,13 @@ class MeterCreate(BaseModel):
     serial_number: str
     label: str
     location: MeterLocation
+    canal: int = 0
 
 class MeterUpdate(BaseModel):
     label: Optional[str] = None
     location: Optional[MeterLocation] = None
     owner_id: Optional[uuid.UUID] = None
+    canal: Optional[int] = None
 
 class AdminMeterCreate(MeterCreate):
     owner_id: Optional[uuid.UUID] = None
@@ -30,6 +32,7 @@ class MeterResponse(BaseModel):
     credit_kwh: float = Field(alias="kwh_saldo")
     relay_state: bool = Field(alias="estado_rele")
     last_recharge_at: Optional[datetime] = Field(alias="ultima_recarga")
+    canal: int = 0
 
     class Config:
         from_attributes = True

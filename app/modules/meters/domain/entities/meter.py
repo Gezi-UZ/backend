@@ -31,9 +31,10 @@ class Contador(Base, TimestampMixin):
     # Chaves Estrangeiras
     utilizador_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("utilizadores.id"), nullable=True)
     # O dispositivo_id ser nullable=True permite ter contadores no sistema antes de instalar o hardware
-    dispositivo_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("dispositivo_iot.id"), unique=True, nullable=True)
+    dispositivo_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("dispositivo_iot.id"), nullable=True)
+    canal: Mapped[int] = mapped_column(default=0)
     
     # Relacionamentos
     utilizador: Mapped["Utilizador"] = relationship(back_populates="contadores")
-    dispositivo: Mapped["DispositivoIoT"] = relationship(back_populates="contador")
+    dispositivo: Mapped["DispositivoIoT"] = relationship(back_populates="contadores")
     recargas: Mapped[list["Recarga"]] = relationship(back_populates="contador")

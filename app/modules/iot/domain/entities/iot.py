@@ -31,4 +31,4 @@ class DispositivoIoT(Base, TimestampMixin):
 
 
     # Relacionamentos
-    contador: Mapped['Contador'] = relationship(back_populates='dispositivo', uselist=False)
+    contadores: Mapped[list['Contador']] = relationship(back_populates='dispositivo')
