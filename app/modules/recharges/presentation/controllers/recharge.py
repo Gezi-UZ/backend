@@ -20,12 +20,14 @@ from app.modules.recharges.presentation.dependencies import (
     get_recharge_history_usecase,
     get_recharge_dashboard_usecase,
     get_apply_manual_code_usecase,
+    get_calculate_recharge_breakdown_usecase,
 )
 from app.modules.recharges.application.usecases.recharge_service import (
     InitiateRechargeUseCase,
     GetRechargeStatusUseCase,
     GetRechargeHistoryUseCase,
     GetRechargeDashboardUseCase,
+    CalculateRechargeBreakdownUseCase,
 )
 from app.modules.recharges.application.usecases.manual_code import ApplyManualCodeUseCase
 
@@ -82,6 +84,26 @@ async def initiate_recharge(
     e o estado é actualizado via polling (SSE stream + background task).
     """
     result = await usecase.execute(current_user.id, data)
+    return {
+        "success": True,
+        "data": result.model_dump(),
+        "error": None,
+        "timestamp": datetime.utcnow().isoformat() + "Z",
+    }
+
+
+@router.get("/calculate")
+def calculate_recharge(
+    meter_id: uuid.UUID = Query(..., description="ID do contador"),
+    amount_mzn: float = Query(..., description="Montante em MZN"),
+    current_user: AuthUser = Depends(get_current_user),
+    usecase: CalculateRechargeBreakdownUseCase = Depends(get_calculate_recharge_breakdown_usecase),
+) -> Dict[str, Any]:
+    """
+    Calcula o desdobramento tarifário simulado antes da recarga ser efetivada.
+    Útil para mostrar transparência ao cliente na UI.
+    """
+    result = usecase.execute(current_user.id, meter_id, amount_mzn)
     return {
         "success": True,
         "data": result.model_dump(),

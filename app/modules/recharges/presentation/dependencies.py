@@ -59,6 +59,13 @@ def get_apply_manual_code_usecase(
 ):
     return ApplyManualCodeUseCase(recharge_repo, meter_repo)
 
+def get_calculate_recharge_breakdown_usecase(
+    recharge_repo: SQLAlchemyRechargeRepository = Depends(get_recharge_repository),
+    meter_repo: SQLAlchemyMeterRepository = Depends(get_meter_repository),
+):
+    from app.modules.recharges.application.usecases.recharge_service import CalculateRechargeBreakdownUseCase
+    return CalculateRechargeBreakdownUseCase(recharge_repo, meter_repo)
+
 def get_list_admin_transactions_usecase(
     recharge_repo: SQLAlchemyRechargeRepository = Depends(get_recharge_repository)
 ):

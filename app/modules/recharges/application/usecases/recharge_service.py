@@ -91,7 +91,7 @@ class InitiateRechargeUseCase:
         # 4. Calcular desdobramento tarifário
         breakdown = calcular_desdobramento(
             montante_total=data.amount_mzn,
-            divida_pendente=0.0,  # TODO: integrar com sistema de dívidas EDM
+            divida_pendente=meter.divida_pendente,
             is_primeira_compra_mes=is_primeira_compra_mes,
         )
 
@@ -116,9 +116,11 @@ class InitiateRechargeUseCase:
                 amount=data.amount_mzn,
                 phone=phone,
             )
-            # Actualizar estado da recarga para PAYMENT_PROCESSING
+            # Actualizar estado da recarga dependendo do estado do pagamento
             if payment_status == "PROCESSING":
                 self.recharge_repo.update_status(recharge.id, "PAYMENT_PROCESSING")
+            elif payment_status == "FAILED":
+                self.recharge_repo.update_status(recharge.id, "FAILED")
         else:
             logger.warning(
                 f"Recarga {recharge.id}: Sem telefone disponível para STK Push. "
@@ -134,9 +136,15 @@ class InitiateRechargeUseCase:
             detalhes=f"Utilizador {user_id} iniciou recarga de {data.amount_mzn} MZN. Recharge ID: {recharge.id}"
         )
 
+        status_result = recharge.estado
+        if payment_status == "PROCESSING":
+            status_result = "PAYMENT_PROCESSING"
+        elif payment_status == "FAILED":
+            status_result = "FAILED"
+
         return RechargeInitiateResponse(
             recharge_id=recharge.id,
-            status="PAYMENT_PROCESSING" if payment_status == "PROCESSING" else recharge.estado,
+            status=status_result,
             amount_mzn=recharge.montante_pago,
             estimated_kwh=breakdown["kwh_calculado"],
             payment_status=payment_status,
@@ -309,3 +317,33 @@ class GetRechargeDashboardUseCase:
             to_date=to_date,
         )
         return RechargeDashboardResponse(**stats)
+
+
+class CalculateRechargeBreakdownUseCase:
+    """Calcula o desdobramento tarifário simulado antes do pagamento (usado pela App)."""
+
+    def __init__(self, recharge_repo: IRechargeRepository, meter_repo: IMeterRepository):
+        self.recharge_repo = recharge_repo
+        self.meter_repo = meter_repo
+
+    def execute(self, user_id: uuid.UUID, meter_id: uuid.UUID, amount_mzn: float) -> RechargeBreakdownResponse:
+        # 1. Verificar que o contador pertence ao utilizador
+        meter = self.meter_repo.get_by_id(meter_id)
+        if not meter:
+            raise HTTPException(status_code=404, detail="Contador não encontrado.")
+        if meter.utilizador_id != user_id:
+            raise HTTPException(status_code=403, detail="Contador não pertence ao utilizador.")
+
+        # 2. Verificar se é primeira compra do mês
+        is_primeira_compra_mes = not self.recharge_repo.has_successful_recharge_this_month(meter_id=meter_id)
+
+        # 3. Calcular
+        try:
+            breakdown = calcular_desdobramento(
+                montante_total=amount_mzn,
+                divida_pendente=meter.divida_pendente,
+                is_primeira_compra_mes=is_primeira_compra_mes,
+            )
+            return RechargeBreakdownResponse(**breakdown)
+        except ValueError as e:
+            raise HTTPException(status_code=422, detail=str(e))

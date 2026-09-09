@@ -34,6 +34,7 @@ class RechargeBreakdownResponse(BaseModel):
     tx_radio: float
     tx_lixo: float
     kwh_calculado: float
+    nova_divida: float = 0.0
 
 
 class RechargeInitiateResponse(BaseModel):

@@ -12,7 +12,8 @@ Quando um pagamento eh confirmado (callback M-Pesa ou token manual valido):
 import asyncio
 import uuid
 import logging
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
+import random
 
 from sqlalchemy.orm import Session
 
@@ -101,6 +102,14 @@ class ConfirmPaymentUseCase:
             .first()
         )
 
+        # Atualizar divida pendente no contador
+        if contador:
+            nova_divida = desdobramento.get("nova_divida", 0.0)
+            divida_paga = desdobramento.get("divida_paga", 0.0)
+            contador.divida_pendente += nova_divida - divida_paga
+            if contador.divida_pendente < 0:
+                contador.divida_pendente = 0.0
+
         if not contador or not contador.dispositivo_id:
             recarga.estado = "CONFIRMED_NO_DEVICE"
             self.db.commit()
@@ -110,6 +119,21 @@ class ConfirmPaymentUseCase:
                 "status": "CONFIRMED_NO_DEVICE",
                 "message": "Pagamento confirmado mas sem dispositivo para enviar comando",
             }
+            
+        # Determine if the meter is online
+        is_online = False
+        if contador.ultima_sincronizacao:
+            sync_time = contador.ultima_sincronizacao
+            if sync_time.tzinfo is None:
+                sync_time = sync_time.replace(tzinfo=timezone.utc)
+            is_online = (datetime.now(timezone.utc) - sync_time) <= timedelta(minutes=5)
+            
+        if not is_online:
+            # Fallback: Generate STS token
+            raw_digits = "".join([str(random.randint(0, 9)) for _ in range(20)])
+            token_sts = f"{raw_digits[0:4]}-{raw_digits[4:8]}-{raw_digits[8:12]}-{raw_digits[12:16]}-{raw_digits[16:20]}"
+            recarga.token_sts = token_sts
+            logger.info(f"ConfirmPayment: Contador offline. Código STS manual gerado para recarga '{recarga.id}'")
 
         # 6. Criar ComandoIoT na BD
         comando = ComandoIoT(
@@ -153,6 +177,7 @@ class ConfirmPaymentUseCase:
                 "status": "MQTT_SENT",
                 "kwh": desdobramento["kwh_calculado"],
                 "command_id": str(comando.id),
+                "token": recarga.token_sts,
             }
         })
 

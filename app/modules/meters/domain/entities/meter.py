@@ -25,6 +25,7 @@ class Contador(Base, TimestampMixin):
     is_online: Mapped[bool] = mapped_column(Boolean, default=False)
     is_primary: Mapped[bool] = mapped_column(Boolean, default=False)
     kwh_saldo: Mapped[float] = mapped_column(Double, default=0.0)
+    divida_pendente: Mapped[float] = mapped_column(Double, default=0.0)
     estado_rele: Mapped[bool] = mapped_column(Boolean, default=True)
     ultima_sincronizacao: Mapped[datetime] = mapped_column(nullable=True)
     ultima_recarga: Mapped[datetime] = mapped_column(nullable=True)

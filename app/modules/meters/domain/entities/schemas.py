@@ -56,6 +56,7 @@ class MeterStatusResponse(BaseModel):
     credit_kwh: float = Field(alias="kwh_saldo")
     relay_state: bool = Field(alias="estado_rele")
     last_seen_at: Optional[datetime] = Field(alias="ultima_sincronizacao")
+    is_online: bool = Field(alias="is_online", default=False)
 
     class Config:
         from_attributes = True

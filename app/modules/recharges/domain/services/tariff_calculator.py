@@ -15,11 +15,11 @@ sem redeployment).
 
 # ─── Constantes Tarifarias (em MZN) ──────────────────────────────────────────
 # Valores de referencia CREDELEC — actualizar conforme tabela EDM vigente
-TARIFA_KWH = 6.50          # MZN por kWh (bloco residencial basico)
-TAXA_IVA = 0.17            # 17%
+TARIFA_KWH = 7.64          # MZN por kWh (bloco residencial basico)
+TAXA_IVA = 0.16            # 16%
 TAXA_RADIO = 15.00         # MZN/mes (cobranca unica no mes)
-TAXA_LIXO = 10.00          # MZN/mes (cobranca unica no mes)
-MONTANTE_MINIMO_MZN = 50.0 # Recarga minima permitida (RN01)
+TAXA_LIXO = 100.00         # MZN/mes (cobranca unica no mes)
+MONTANTE_MINIMO_MZN = 10.0 # Recarga minima permitida (RN01)
 
 
 def calcular_desdobramento(
@@ -44,26 +44,38 @@ def calcular_desdobramento(
             f"Recebido: {montante_total} MZN."
         )
 
-    restante = montante_total
-
-    # 1. Amortizar divida pendente primeiro
-    divida_paga = min(divida_pendente, restante)
-    restante -= divida_paga
-
-    # 2. Taxas fixas mensais (so na primeira recarga do mes)
+    # Dedicate max 50% for taxes and debt
+    max_deducao = montante_total * 0.5
+    total_deduzido = 0.0
+    
+    # 1. Taxas fixas mensais (so na primeira recarga do mes)
     tx_radio = 0.0
     tx_lixo = 0.0
+    nova_divida = 0.0
+    
     if is_primeira_compra_mes:
-        if montante_total == 100.0:
-            tx_lixo = 50.0
-            restante -= tx_lixo
-            tx_radio = min(TAXA_RADIO, restante)
-            restante -= tx_radio
-        else:
-            tx_radio = min(TAXA_RADIO, restante)
-            restante -= tx_radio
-            tx_lixo = min(TAXA_LIXO, restante)
-            restante -= tx_lixo
+        tx_radio_total = TAXA_RADIO
+        tx_lixo_total = TAXA_LIXO
+        
+        # Priority to Rádio
+        pago_radio = min(tx_radio_total, max_deducao - total_deduzido)
+        tx_radio = pago_radio
+        total_deduzido += pago_radio
+        nova_divida += (tx_radio_total - pago_radio)
+        
+        # Then Lixo
+        pago_lixo = min(tx_lixo_total, max_deducao - total_deduzido)
+        tx_lixo = pago_lixo
+        total_deduzido += pago_lixo
+        nova_divida += (tx_lixo_total - pago_lixo)
+
+    # 2. Amortizar divida pendente (se houver espaco nos 50%)
+    divida_paga = min(divida_pendente, max_deducao - total_deduzido)
+    total_deduzido += divida_paga
+    # The remainder of divida_pendente stays as debt
+    nova_divida += (divida_pendente - divida_paga)
+
+    restante = montante_total - total_deduzido
 
     # 3. IVA calculado sobre o montante de energia (restante apos taxas/divida)
     # Formula: montante_liquido = restante / (1 + IVA)
@@ -80,5 +92,6 @@ def calcular_desdobramento(
         "divida_paga": round(divida_paga, 2),
         "tx_radio": round(tx_radio, 2),
         "tx_lixo": round(tx_lixo, 2),
-        "kwh_calculado": round(kwh_calculado, 4),
+        "kwh_calculado": round(kwh_calculado, 2),
+        "nova_divida": round(nova_divida, 2),
     }

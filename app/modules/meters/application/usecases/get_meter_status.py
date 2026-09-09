@@ -15,5 +15,18 @@ class GetMeterStatusUseCase:
         
         if meter.utilizador_id != user_id:
             raise HTTPException(status_code=403, detail="Contador não pertence ao utilizador autenticado")
+        from datetime import datetime, timezone, timedelta
+        
+        # Calculate dynamic online status
+        if meter.ultima_sincronizacao:
+            # Check if ultima_sincronizacao is naive, if so, assume UTC
+            sync_time = meter.ultima_sincronizacao
+            if sync_time.tzinfo is None:
+                sync_time = sync_time.replace(tzinfo=timezone.utc)
+            
+            is_recent = (datetime.now(timezone.utc) - sync_time) <= timedelta(minutes=5)
+            meter.is_online = is_recent
+        else:
+            meter.is_online = False
             
         return meter
