@@ -83,19 +83,25 @@ class InitiateRechargeUseCase:
                 detail="Contador não pertence ao utilizador autenticado.",
             )
 
-        # 3. Calcular desdobramento tarifário
+        # 3. Verificar se é a primeira compra do mês para este contador (RN — taxas fixas mensais)
+        is_primeira_compra_mes = not self.recharge_repo.has_successful_recharge_this_month(
+            meter_id=data.meter_id
+        )
+
+        # 4. Calcular desdobramento tarifário
         breakdown = calcular_desdobramento(
             montante_total=data.amount_mzn,
             divida_pendente=0.0,  # TODO: integrar com sistema de dívidas EDM
-            is_primeira_compra_mes=False,  # TODO: verificar histórico do mês
+            is_primeira_compra_mes=is_primeira_compra_mes,
         )
 
-        # 4. Criar recarga com estado PENDING
+        # 5. Criar recarga com estado PENDING
         recharge = self.recharge_repo.create_with_breakdown(
             user_id=user_id,
             meter_id=data.meter_id,
             montante=data.amount_mzn,
             breakdown_data=breakdown,
+            is_primeira_compra=is_primeira_compra_mes,
         )
 
         # 5. Resolver número de telefone para o STK Push
@@ -134,6 +140,7 @@ class InitiateRechargeUseCase:
             amount_mzn=recharge.montante_pago,
             estimated_kwh=breakdown["kwh_calculado"],
             payment_status=payment_status,
+            is_primeira_compra_mes=is_primeira_compra_mes,
             breakdown=RechargeBreakdownResponse(**breakdown),
         )
 

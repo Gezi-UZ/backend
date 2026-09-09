@@ -42,6 +42,7 @@ class RechargeInitiateResponse(BaseModel):
     amount_mzn: float
     estimated_kwh: float
     payment_status: str = "INITIATED"  # Estado do STK Push: INITIATED, PROCESSING, FAILED
+    is_primeira_compra_mes: bool = False
     breakdown: Optional[RechargeBreakdownResponse] = None
 
 

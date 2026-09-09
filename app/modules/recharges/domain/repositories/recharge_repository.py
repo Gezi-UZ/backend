@@ -76,3 +76,8 @@ class IRechargeRepository(ABC):
     ) -> dict:
         """Agrega estatísticas de consumo para o dashboard."""
         ...
+
+    @abstractmethod
+    def has_successful_recharge_this_month(self, meter_id: uuid.UUID) -> bool:
+        """Verifica se o contador já tem uma recarga bem-sucedida no mês corrente."""
+        ...

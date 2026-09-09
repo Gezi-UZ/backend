@@ -182,6 +182,27 @@ class SQLAlchemyRechargeRepository(IRechargeRepository):
             self.db.refresh(db_recharge)
         return db_recharge
 
+    def has_successful_recharge_this_month(self, meter_id: uuid.UUID) -> bool:
+        """
+        Verifica se o contador já tem uma recarga bem-sucedida no mês corrente.
+        Usado para determinar se é a primeira compra do mês (cobra taxas fixas).
+        Uma recarga conta se estiver em qualquer estado de sucesso:
+        CONFIRMED, MQTT_SENT, ACK_RECEIVED, COMPLETED.
+        """
+        from sqlalchemy import extract
+        now = datetime.utcnow()
+        count = (
+            self.db.query(Recarga)
+            .filter(
+                Recarga.contador_id == meter_id,
+                Recarga.estado.in_(["CONFIRMED", "MQTT_SENT", "ACK_RECEIVED", "COMPLETED"]),
+                extract("year", Recarga.criado_em) == now.year,
+                extract("month", Recarga.criado_em) == now.month,
+            )
+            .count()
+        )
+        return count > 0
+
     def mark_token_used(self, recharge_id: uuid.UUID, applied_at: datetime) -> Optional[Recarga]:
         db_recharge = self.get_by_id(recharge_id)
         if db_recharge:
@@ -200,12 +221,11 @@ class SQLAlchemyRechargeRepository(IRechargeRepository):
         to_date: Optional[datetime] = None,
     ) -> dict:
         from sqlalchemy import or_
-        from sqlalchemy.orm import contains_eager
-        
+
+        # Recargas bem-sucedidas acessíveis ao utilizador (owner do contador OU iniciador)
         query = (
             self.db.query(Recarga)
             .join(Contador, Recarga.contador_id == Contador.id)
-            .options(contains_eager(Recarga.contador))
             .filter(or_(Contador.utilizador_id == user_id, Recarga.utilizador_id == user_id))
             .filter(Recarga.estado.in_(["CONFIRMED", "MQTT_SENT", "ACK_RECEIVED", "COMPLETED"]))
         )
@@ -217,9 +237,13 @@ class SQLAlchemyRechargeRepository(IRechargeRepository):
             query = query.filter(Recarga.criado_em <= to_date)
 
         recharges = query.all()
-        
-        total_spent = sum(r.montante_pago for r in recharges if r.utilizador_id == user_id)
-        total_kwh = sum(r.kwh_creditado or 0.0 for r in recharges if r.contador.utilizador_id == user_id)
+
+        # total_spent: montante pago pelo próprio utilizador
+        total_spent = sum(
+            r.montante_pago for r in recharges if r.utilizador_id == user_id
+        )
+        # total_kwh: energia creditada em qualquer contador do utilizador (inclui recargas recebidas)
+        total_kwh = sum(r.kwh_creditado or 0.0 for r in recharges)
         count = len(recharges)
 
         # Calcular média diária de consumo
@@ -236,3 +260,4 @@ class SQLAlchemyRechargeRepository(IRechargeRepository):
             "average_consumption_kwh_day": avg_kwh_day,
             "recharge_count": count,
         }
+

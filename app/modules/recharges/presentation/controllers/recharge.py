@@ -237,6 +237,7 @@ def get_recharge_dashboard(
     from datetime import timedelta
     now = datetime.utcnow()
     period_map = {
+        "today": timedelta(days=1),
         "week": timedelta(days=7),
         "month": timedelta(days=30),
         "year": timedelta(days=365),
