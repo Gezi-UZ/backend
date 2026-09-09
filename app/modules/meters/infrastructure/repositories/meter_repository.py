@@ -45,6 +45,13 @@ class SQLAlchemyMeterRepository(IMeterRepository):
                 db_meter.address = meter_update.location.address
             if getattr(meter_update, "canal", None) is not None:
                 db_meter.canal = meter_update.canal
+            if getattr(meter_update, "is_primary", None) is not None:
+                db_meter.is_primary = meter_update.is_primary
+                if meter_update.is_primary and db_meter.utilizador_id:
+                    self.db.query(Contador).filter(
+                        Contador.utilizador_id == db_meter.utilizador_id,
+                        Contador.id != db_meter.id
+                    ).update({"is_primary": False})
             # Allow resetting owner if explicitly provided (e.g. some constant) but typically None means don't update.
             # To set owner_id, we check if it is part of the request.
             # Actually, Pydantic's exclude_unset is better, but here we just check if it's set. 
@@ -114,7 +121,8 @@ class SQLAlchemyMeterRepository(IMeterRepository):
                 "device_mac": r.device_mac,
                 "firmware_version": r.firmware_version,
                 "last_seen_at": r.last_seen_at,
-                "canal": getattr(meter, "canal", 0) or 0
+                "canal": getattr(meter, "canal", 0) or 0,
+                "is_primary": meter.is_primary
             }
             formatted.append(item)
             

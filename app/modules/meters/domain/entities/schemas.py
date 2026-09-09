@@ -19,6 +19,7 @@ class MeterUpdate(BaseModel):
     location: Optional[MeterLocation] = None
     owner_id: Optional[uuid.UUID] = None
     canal: Optional[int] = None
+    is_primary: Optional[bool] = None
 
 class AdminMeterCreate(MeterCreate):
     owner_id: Optional[uuid.UUID] = None
@@ -33,6 +34,7 @@ class MeterResponse(BaseModel):
     relay_state: bool = Field(alias="estado_rele")
     last_recharge_at: Optional[datetime] = Field(alias="ultima_recarga")
     canal: int = 0
+    is_primary: bool = Field(alias="is_primary", default=False)
 
     class Config:
         from_attributes = True
