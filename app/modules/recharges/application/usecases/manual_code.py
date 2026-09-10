@@ -27,6 +27,7 @@ class ApplyManualCodeUseCase:
     def __init__(self, recharge_repo: IRechargeRepository, meter_repo: IMeterRepository, db=None):
         self.recharge_repo = recharge_repo
         self.meter_repo = meter_repo
+        self.db = db
         self.notification_service = NotificationService(db) if db else None
 
     def execute(self, user_id: uuid.UUID, data: ManualCodeRequest) -> ManualCodeResponse:
@@ -68,6 +69,41 @@ class ApplyManualCodeUseCase:
         # 5. Marcar token como usado e actualizar estado para MQTT_SENT
         now = datetime.now(timezone.utc)
         updated_recharge = self.recharge_repo.mark_token_used(existing_recharge.id, now)
+
+        from app.modules.iot.domain.entities.comando_iot import ComandoIoT
+        from app.core.mqtt import publish_command
+
+        # Criar ComandoIoT na BD
+        comando = ComandoIoT(
+            id=uuid.uuid4(),
+            tipo="RECHARGE",
+            estado="ENVIADO",
+            hmac_token=updated_recharge.token_sts or "",
+            dispositivo_id=meter.dispositivo_id if meter else None,
+            recarga_id=updated_recharge.id,
+        )
+        if hasattr(self, 'db') and self.db:
+            self.db.add(comando)
+            self.db.commit()
+
+        # Enviar comando MQTT se houver dispositivo
+        if meter and meter.numero_serie:
+            try:
+                publish_command(
+                    meter_serial=meter.numero_serie,
+                    command_type="APPLY_CREDITS",
+                    payload={
+                        "command_id": str(comando.id),
+                        "token": formatted_code,
+                        "kwh": updated_recharge.kwh_creditado or 0.0,
+                        "issued_at": now.isoformat() + "Z",
+                    },
+                )
+                import logging
+                logging.getLogger(__name__).info(f"ApplyManualCode: Comando MQTT APPLY_CREDITS enviado para o contador {meter.numero_serie}")
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).error(f"ApplyManualCode: Erro ao publicar MQTT: {e}")
 
         # 6. Notificar o utilizador
         if self.notification_service:
