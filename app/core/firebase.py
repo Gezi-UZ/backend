@@ -17,8 +17,24 @@ def init_firebase():
         firebase_admin.get_app()
     except ValueError:
         try:
-            # Load the credentials from the JSON string
-            service_account_info = json.loads(settings.firebase_service_account)
+            raw_val = settings.firebase_service_account.strip()
+            # Handle string double-quoting or escaping from environment variables
+            if raw_val.startswith('"') and raw_val.endswith('"'):
+                try:
+                    raw_val = json.loads(raw_val)
+                except Exception:
+                    raw_val = raw_val[1:-1]
+
+            if isinstance(raw_val, str):
+                service_account_info = json.loads(raw_val)
+            else:
+                service_account_info = raw_val
+
+            if isinstance(service_account_info, dict) and "private_key" in service_account_info:
+                pk = service_account_info["private_key"]
+                if isinstance(pk, str):
+                    service_account_info["private_key"] = pk.replace("\\n", "\n")
+
             cred = credentials.Certificate(service_account_info)
             firebase_admin.initialize_app(cred)
             logger.info("Firebase Admin initialized successfully.")
