@@ -10,8 +10,8 @@ from app.modules.recharges.domain.entities.schemas import ManualCodeRequest, Man
 from app.modules.recharges.domain.services.tariff_calculator import calcular_desdobramento
 from app.modules.notifications.application.notification_service import NotificationService
 
-# Formato CREDELEC: 4 grupos de 4 dígitos separados por hífen
-_CREDELEC_CODE_PATTERN = re.compile(r"^\d{4}-\d{4}-\d{4}-\d{4}$")
+# Formato CREDELEC: 5 grupos de 4 dígitos separados por hífen (20 dígitos)
+_CREDELEC_CODE_PATTERN = re.compile(r"^\d{4}-\d{4}-\d{4}-\d{4}-\d{4}$")
 
 
 class ApplyManualCodeUseCase:
@@ -30,15 +30,20 @@ class ApplyManualCodeUseCase:
         self.notification_service = NotificationService(db) if db else None
 
     def execute(self, user_id: uuid.UUID, data: ManualCodeRequest) -> ManualCodeResponse:
-        # 1. Validar formato do código
-        if not _CREDELEC_CODE_PATTERN.match(data.recharge_code):
+        # 1. Validar formato do código (remover espaços e hífenes e formatar como XXXXX-XXXX-XXXX-XXXX-XXXX)
+        normalized_code = data.recharge_code.replace("-", "").replace(" ", "")
+        if not re.match(r"^\d{20}$", normalized_code):
             raise HTTPException(
                 status_code=422,
-                detail="Código inválido. Formato esperado: XXXX-XXXX-XXXX-XXXX (apenas dígitos)."
+                detail="Código inválido. Formato esperado: 20 dígitos (ex: XXXX-XXXX-XXXX-XXXX-XXXX)."
             )
+        
+        # Voltar a formatar o código com hífenes para a pesquisa na BD
+        formatted_code = f"{normalized_code[0:4]}-{normalized_code[4:8]}-{normalized_code[8:12]}-{normalized_code[12:16]}-{normalized_code[16:20]}"
+
 
         # 2. Procurar a recarga associada a este código STS
-        existing_recharge = self.recharge_repo.get_by_meter_and_code(data.recharge_code)
+        existing_recharge = self.recharge_repo.get_by_meter_and_code(formatted_code)
         if not existing_recharge:
             raise HTTPException(
                 status_code=404,
