@@ -95,7 +95,7 @@ def get_meter_status(
     current_user: AuthUser = Depends(get_current_user),
     usecase: GetMeterStatusUseCase = Depends(get_get_meter_status_usecase)
 ) -> Dict[str, Any]:
-    meter = usecase.execute(current_user.id, meter_id)
+    meter = usecase.execute(meter_id)
     return {
         "success": True,
         "data": MeterStatusResponse.model_validate(meter).model_dump(by_alias=True)

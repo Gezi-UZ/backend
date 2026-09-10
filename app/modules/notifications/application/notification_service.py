@@ -78,7 +78,7 @@ class NotificationService:
         self.create_notification(
             user_id=user_id,
             type="recharge_success",
-            title="Recarga concluída! ✅",
+            title="Recarga concluída!",
             body=f"A sua recarga de {amount_mzn:.0f} MT ({kwh:.2f} kWh) foi aplicada ao contador {meter_number}.",
             metadata={
                 "recharge_id": str(recharge_id),
@@ -98,7 +98,7 @@ class NotificationService:
         self.create_notification(
             user_id=user_id,
             type="recharge_failed",
-            title="Falha na recarga ❌",
+            title="Falha na recarga",
             body=f"O pagamento de {amount_mzn:.0f} MT não foi confirmado. Nenhum valor foi cobrado.",
             metadata={
                 "recharge_id": str(recharge_id),
@@ -117,13 +117,50 @@ class NotificationService:
         self.create_notification(
             user_id=user_id,
             type="recharge_success",
-            title="Código STS aplicado! ✅",
+            title="Código STS aplicado!",
             body=f"{kwh:.2f} kWh adicionados ao contador {meter_number} via código STS.",
             metadata={
                 "recharge_id": str(recharge_id),
                 "kwh": kwh,
                 "meter_number": meter_number,
                 "method": "STS_CODE",
+            },
+        )
+    def notify_low_balance(
+        self,
+        user_id: uuid.UUID,
+        meter_id: uuid.UUID,
+        meter_number: str,
+        kwh_remaining: float,
+    ) -> None:
+        """Notifica o utilizador que o saldo do contador está baixo."""
+        self.create_notification(
+            user_id=user_id,
+            type="low_balance",
+            title="Saldo baixo",
+            body=f"O contador {meter_number} tem apenas {kwh_remaining:.2f} kWh de saldo. Recarregue em breve para evitar o corte de energia.",
+            metadata={
+                "meter_id": str(meter_id),
+                "meter_number": meter_number,
+                "kwh_remaining": kwh_remaining,
+            },
+        )
+
+    def notify_out_of_balance(
+        self,
+        user_id: uuid.UUID,
+        meter_id: uuid.UUID,
+        meter_number: str,
+    ) -> None:
+        """Notifica o utilizador que o saldo do contador esgotou."""
+        self.create_notification(
+            user_id=user_id,
+            type="out_of_balance",
+            title="Saldo esgotado",
+            body=f"O saldo do contador {meter_number} esgotou. A energia foi ou será cortada em breve.",
+            metadata={
+                "meter_id": str(meter_id),
+                "meter_number": meter_number,
             },
         )
 
