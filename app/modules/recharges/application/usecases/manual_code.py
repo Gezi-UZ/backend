@@ -54,7 +54,7 @@ class ApplyManualCodeUseCase:
         if existing_recharge.token_sts_usado:
             raise HTTPException(
                 status_code=409,
-                detail="Este código já foi utilizado anteriormente (RN10)."
+                detail="Este código já foi utilizado anteriormente. "
             )
 
         # 4. Verificar que o contador pertence ao utilizador (RN09)
