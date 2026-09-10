@@ -62,6 +62,13 @@ class ProcessAckUseCase:
             .filter(Contador.numero_serie == serial)
             .first()
         )
+        if contador:
+            now = datetime.utcnow()
+            contador.ultima_sincronizacao = now
+            contador.is_online = True
+            contador.estado = "ONLINE"
+            if contador.dispositivo:
+                contador.dispositivo.ultimo_heartbeat = now
 
         # Se o comando esta ligado a uma recarga, finalizar o ciclo
         if comando.recarga_id:

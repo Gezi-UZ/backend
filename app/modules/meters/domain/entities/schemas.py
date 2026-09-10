@@ -51,12 +51,19 @@ class MeterResponse(BaseModel):
                 longitude=obj.longitude,
                 address=obj.address
             )
-        # Compute dynamic is_online based on ultima_sincronizacao (threshold: 5 minutes)
+        # Compute dynamic is_online based on ultima_sincronizacao or dispositivo.ultimo_heartbeat (threshold: 5 minutes)
         from datetime import timezone, timedelta
         sync_time = getattr(obj, "ultima_sincronizacao", None)
+        dispositivo = getattr(obj, "dispositivo", None)
+        if dispositivo and getattr(dispositivo, "ultimo_heartbeat", None):
+            heartbeat = dispositivo.ultimo_heartbeat
+            if sync_time is None or heartbeat > sync_time:
+                sync_time = heartbeat
+
         if sync_time:
             if sync_time.tzinfo is None:
                 sync_time = sync_time.replace(tzinfo=timezone.utc)
+            obj.ultima_sincronizacao = sync_time
             obj.is_online = (datetime.now(timezone.utc) - sync_time) <= timedelta(minutes=5)
         else:
             obj.is_online = False
@@ -72,6 +79,25 @@ class MeterStatusResponse(BaseModel):
     class Config:
         from_attributes = True
         populate_by_name = True
+
+    @classmethod
+    def model_validate(cls, obj, *args, **kwargs):
+        from datetime import timezone, timedelta
+        sync_time = getattr(obj, "ultima_sincronizacao", None)
+        dispositivo = getattr(obj, "dispositivo", None)
+        if dispositivo and getattr(dispositivo, "ultimo_heartbeat", None):
+            heartbeat = dispositivo.ultimo_heartbeat
+            if sync_time is None or heartbeat > sync_time:
+                sync_time = heartbeat
+
+        if sync_time:
+            if sync_time.tzinfo is None:
+                sync_time = sync_time.replace(tzinfo=timezone.utc)
+            obj.ultima_sincronizacao = sync_time
+            obj.is_online = (datetime.now(timezone.utc) - sync_time) <= timedelta(minutes=5)
+        else:
+            obj.is_online = False
+        return super().model_validate(obj, *args, **kwargs)
 
 class AdminMeterDetailResponse(MeterResponse):
     owner_name: Optional[str] = None

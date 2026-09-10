@@ -49,7 +49,19 @@ class ProcessTelemetryUseCase:
 
         # Atualizar campos do contador
         if "kwh" in payload:
-            contador.kwh_saldo = payload["kwh"]
+            telemetry_kwh = float(payload["kwh"])
+            now = datetime.utcnow()
+            has_fresh_recharge = (
+                contador.ultima_recarga is not None
+                and (now - contador.ultima_recarga).total_seconds() < 300
+            )
+            if has_fresh_recharge and (contador.kwh_saldo or 0) > telemetry_kwh + 0.1:
+                logger.info(
+                    f"Telemetria: Ignorando saldo antigo ({telemetry_kwh:.2f}) a favor de recarga recente "
+                    f"({contador.kwh_saldo:.2f}) no contador '{serial}'"
+                )
+            else:
+                contador.kwh_saldo = telemetry_kwh
         if "relay" in payload:
             contador.estado_rele = payload["relay"]
 

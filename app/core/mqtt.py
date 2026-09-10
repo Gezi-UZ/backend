@@ -50,12 +50,15 @@ if settings.mqtt_use_tls:
 def on_connect(client, userdata, flags, reason_code, properties):
     if reason_code == 0:
         logger.info("MQTT: Conectado ao Broker com sucesso!")
-        # Subscrever aos topicos de telemetria e ack usando Shared Subscriptions ($share/grupo/)
-        # Isso garante que apenas 1 worker processa cada mensagem, evitando duplicados.
+        # Subscrever aos topicos de telemetria, ack e hello
+        # Usar subscriptions directas e shared subscriptions para garantir recepção em qualquer ambiente
         client.subscribe("$share/gezi_group/credelec/meter/+/telemetry", qos=1)
+        client.subscribe("credelec/meter/+/telemetry", qos=1)
         client.subscribe("$share/gezi_group/credelec/meter/+/ack", qos=1)
+        client.subscribe("credelec/meter/+/ack", qos=1)
         client.subscribe("$share/gezi_group/gezi/v1/+/hello", qos=1)
-        logger.info("MQTT: Subscrito a topicos de telemetria, ack e hello")
+        client.subscribe("gezi/v1/+/hello", qos=1)
+        logger.info("MQTT: Subscrito a topicos de telemetria, ack e hello (shared + direct)")
     else:
         logger.error(f"MQTT: Falha ao conectar ao broker, reason_code={reason_code}")
 
@@ -177,16 +180,23 @@ def _handle_hello(mac_address: str, payload: dict):
                     db.commit()
                     logger.info(f"MQTT: Novo Modulo IoT auto-registado: {mac_address}")
                 else:
-                    # Atualiza firmware e ultimo ping se ja existir
-                    if "firmware" in payload:
-                        dispositivo.firmware_version = payload["firmware"]
                     from datetime import datetime
                     dispositivo.ultimo_heartbeat = datetime.utcnow()
+                    if "firmware" in payload:
+                        dispositivo.firmware_version = payload["firmware"]
                     db.commit()
                     logger.info(f"MQTT: Modulo IoT {mac_address} reconectado")
 
-                # Auto-provisionamento no boot: Envia configuração se já tiver contadores vinculados
+                # Auto-provisionamento e atualizacao de estado no boot/reconnect
+                from datetime import datetime
+                now = datetime.utcnow()
                 contadores = db.query(Contador).filter(Contador.dispositivo_id == dispositivo.id).all()
+                for c in contadores:
+                    c.ultima_sincronizacao = now
+                    c.is_online = True
+                    c.estado = "ONLINE"
+                db.commit()
+                logger.info(f"MQTT: Modulo IoT {mac_address} ativo ({len(contadores)} contadores atualizados para ONLINE)")
                 c0 = next((c.numero_serie for c in contadores if c.canal == 0), None)
                 c1 = next((c.numero_serie for c in contadores if c.canal == 1), None)
 
@@ -199,25 +209,63 @@ def _handle_hello(mac_address: str, payload: dict):
                     mqtt_client.publish(config_topic, json.dumps(config_payload), qos=1)
                     logger.info(f"MQTT: Configuração de seriais reenviada no boot para {mac_address}: {config_payload}")
 
-                # Sincronização de saldo no boot: envia SET_BALANCE para cada canal
-                # Garante que o ESP32 usa o saldo do Supabase (fonte da verdade),
-                # evitando divergências após recargas STS aplicadas enquanto offline.
+                # Smart balance sync on boot/reconnect:
+                # Compare Supabase DB balance with ESP32 reported balance to determine source of truth.
+                esp_kwh_map = {
+                    0: payload.get("kwh_c0"),
+                    1: payload.get("kwh_c1"),
+                }
+
                 for contador in contadores:
                     serial = contador.numero_serie
-                    kwh_saldo = float(contador.kwh_saldo or 0.0)
-                    import uuid as _uuid
-                    command_id = str(_uuid.uuid4())
-                    cmd_topic = f"credelec/meter/{serial}/cmd"
-                    cmd_payload = json.dumps({
-                        "command": "SET_BALANCE",
-                        "kwh": round(kwh_saldo, 2),
-                        "command_id": command_id,
-                    })
-                    mqtt_client.publish(cmd_topic, cmd_payload, qos=1)
-                    logger.info(
-                        f"MQTT: SET_BALANCE enviado no boot para {serial} "
-                        f"(canal={contador.canal}, kwh={kwh_saldo:.2f}, cmd_id={command_id})"
-                    )
+                    db_kwh = float(contador.kwh_saldo or 0.0)
+                    esp_kwh = esp_kwh_map.get(contador.canal)
+
+                    if esp_kwh is not None:
+                        esp_kwh = float(esp_kwh)
+                        # Case 1: Supabase DB has a HIGHER balance (recharge was applied in DB while ESP32 was offline/rebooting)
+                        if db_kwh > esp_kwh + 0.05:
+                            import uuid as _uuid
+                            command_id = str(_uuid.uuid4())
+                            cmd_topic = f"credelec/meter/{serial}/cmd"
+                            cmd_payload = json.dumps({
+                                "command": "SET_BALANCE",
+                                "kwh": round(db_kwh, 2),
+                                "command_id": command_id,
+                            })
+                            mqtt_client.publish(cmd_topic, cmd_payload, qos=1)
+                            logger.info(
+                                f"MQTT: SET_BALANCE enviado para {serial} "
+                                f"(canal={contador.canal}, db_kwh={db_kwh:.2f} > esp_kwh={esp_kwh:.2f})"
+                            )
+                        # Case 2: ESP32 balance is HIGHER than DB (ESP32 already applied SET_BALANCE or STS token)
+                        elif esp_kwh > db_kwh:
+                            contador.kwh_saldo = esp_kwh
+                            db.commit()
+                            logger.info(
+                                f"MQTT: DB kwh_saldo atualizado para {esp_kwh:.2f} a partir do ESP32 para {serial} "
+                                f"(canal={contador.canal})"
+                            )
+                        else:
+                            logger.info(
+                                f"MQTT: Saldo em sincronia para {serial} "
+                                f"(canal={contador.canal}, kwh={esp_kwh:.2f})"
+                            )
+                    else:
+                        # Fallback for legacy firmware without kwh_c0/kwh_c1 in hello
+                        import uuid as _uuid
+                        command_id = str(_uuid.uuid4())
+                        cmd_topic = f"credelec/meter/{serial}/cmd"
+                        cmd_payload = json.dumps({
+                            "command": "SET_BALANCE",
+                            "kwh": round(db_kwh, 2),
+                            "command_id": command_id,
+                        })
+                        mqtt_client.publish(cmd_topic, cmd_payload, qos=1)
+                        logger.info(
+                            f"MQTT: SET_BALANCE (fallback) enviado para {serial} "
+                            f"(canal={contador.canal}, kwh={db_kwh:.2f})"
+                        )
             finally:
                 db.close()
         except Exception as e:
