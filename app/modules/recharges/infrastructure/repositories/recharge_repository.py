@@ -187,7 +187,7 @@ class SQLAlchemyRechargeRepository(IRechargeRepository):
         Verifica se o contador já tem uma recarga bem-sucedida no mês corrente.
         Usado para determinar se é a primeira compra do mês (cobra taxas fixas).
         Uma recarga conta se estiver em qualquer estado de sucesso:
-        CONFIRMED, MQTT_SENT, ACK_RECEIVED, COMPLETED.
+        CONFIRMED, MQTT_SENT, ACK_RECEIVED, COMPLETED, CONCLUIDA, CONFIRMED_NO_DEVICE.
         """
         from sqlalchemy import extract
         now = datetime.utcnow()
@@ -195,7 +195,14 @@ class SQLAlchemyRechargeRepository(IRechargeRepository):
             self.db.query(Recarga)
             .filter(
                 Recarga.contador_id == meter_id,
-                Recarga.estado.in_(["CONFIRMED", "MQTT_SENT", "ACK_RECEIVED", "COMPLETED"]),
+                Recarga.estado.in_([
+                    "CONFIRMED",
+                    "MQTT_SENT",
+                    "ACK_RECEIVED",
+                    "COMPLETED",
+                    "CONCLUIDA",           # Estado final após token aplicado (mark_token_used)
+                    "CONFIRMED_NO_DEVICE", # Confirmado mas sem dispositivo IoT associado
+                ]),
                 extract("year", Recarga.criado_em) == now.year,
                 extract("month", Recarga.criado_em) == now.month,
             )
@@ -232,7 +239,7 @@ class SQLAlchemyRechargeRepository(IRechargeRepository):
             self.db.query(Recarga)
             .join(Contador, Recarga.contador_id == Contador.id)
             .filter(or_(Contador.utilizador_id == user_id, Recarga.utilizador_id == user_id))
-            .filter(Recarga.estado.in_(["CONFIRMED", "MQTT_SENT", "ACK_RECEIVED", "COMPLETED"]))
+            .filter(Recarga.estado.in_(["CONFIRMED", "MQTT_SENT", "ACK_RECEIVED", "COMPLETED", "CONCLUIDA", "CONFIRMED_NO_DEVICE"]))
         )
         if meter_id:
             query = query.filter(Recarga.contador_id == meter_id)
