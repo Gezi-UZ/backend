@@ -56,8 +56,9 @@ def get_recharge_dashboard_usecase(
 def get_apply_manual_code_usecase(
     recharge_repo: SQLAlchemyRechargeRepository = Depends(get_recharge_repository),
     meter_repo: SQLAlchemyMeterRepository = Depends(get_meter_repository),
+    db: Session = Depends(get_db),
 ):
-    return ApplyManualCodeUseCase(recharge_repo, meter_repo)
+    return ApplyManualCodeUseCase(recharge_repo, meter_repo, db)
 
 def get_calculate_recharge_breakdown_usecase(
     recharge_repo: SQLAlchemyRechargeRepository = Depends(get_recharge_repository),

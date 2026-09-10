@@ -1,5 +1,5 @@
 """
-ConfirmPaymentUseCase — Pipeline critico: Pagamento → BD → MQTT → SSE.
+ConfirmPaymentUseCase — Pipeline critico: Pagamento → BD → MQTT → SSE → Notificação.
 
 Quando um pagamento eh confirmado (callback M-Pesa ou token manual valido):
 1. Atualiza Pagamento.estado → SUCCESS
@@ -8,6 +8,7 @@ Quando um pagamento eh confirmado (callback M-Pesa ou token manual valido):
 4. Grava ComandoIoT na BD
 5. Publica comando MQTT para o ESP32
 6. Emite evento SSE para o Flutter
+7. Cria notificação in-app + envia FCM push
 """
 import asyncio
 import uuid
@@ -23,6 +24,7 @@ from app.modules.recharges.domain.entities.recharge_breakdown import Desdobramen
 from app.modules.meters.domain.entities.meter import Contador
 from app.modules.iot.domain.entities.comando_iot import ComandoIoT
 from app.modules.recharges.domain.services.tariff_calculator import calcular_desdobramento
+from app.modules.notifications.application.notification_service import NotificationService
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +32,7 @@ logger = logging.getLogger(__name__)
 class ConfirmPaymentUseCase:
     def __init__(self, db: Session):
         self.db = db
+        self.notification_service = NotificationService(db)
 
     def execute(self, referencia_mpesa: str) -> dict:
         """
@@ -112,6 +115,18 @@ class ConfirmPaymentUseCase:
 
         if not contador or not contador.dispositivo_id:
             recarga.estado = "CONFIRMED_NO_DEVICE"
+            self.db.flush()
+            # Notificar com o que temos — sem kWh preciso, sem dispositivo
+            try:
+                self.notification_service.notify_recharge_success(
+                    user_id=recarga.utilizador_id,
+                    recharge_id=recarga.id,
+                    amount_mzn=recarga.montante_pago,
+                    kwh=recarga.kwh_creditado or 0.0,
+                    meter_number=contador.numero_serie if contador else "N/D",
+                )
+            except Exception as _e:
+                logger.error(f"ConfirmPayment: Erro ao criar notificação (no device): {_e}")
             self.db.commit()
             logger.warning(f"ConfirmPayment: Contador sem dispositivo IoT associado")
             return {
@@ -182,6 +197,20 @@ class ConfirmPaymentUseCase:
                 "token": recarga.token_sts,
             }
         })
+
+        # 10. Criar notificação in-app + FCM push
+        try:
+            self.notification_service.notify_recharge_success(
+                user_id=recarga.utilizador_id,
+                recharge_id=recarga.id,
+                amount_mzn=recarga.montante_pago,
+                kwh=desdobramento["kwh_calculado"],
+                meter_number=contador.numero_serie,
+            )
+            self.db.commit()  # Commit final inclui a notificação
+        except Exception as _e:
+            logger.error(f"ConfirmPayment: Erro ao criar notificação: {_e}")
+            self.db.commit()  # Commit mesmo se notificação falhar
 
         logger.info(
             f"ConfirmPayment: Pipeline completo para recarga '{recarga.id}'. "

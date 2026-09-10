@@ -8,6 +8,7 @@ from app.modules.recharges.domain.repositories.recharge_repository import IRecha
 from app.modules.meters.domain.repositories.meter_repository import IMeterRepository
 from app.modules.recharges.domain.entities.schemas import ManualCodeRequest, ManualCodeResponse
 from app.modules.recharges.domain.services.tariff_calculator import calcular_desdobramento
+from app.modules.notifications.application.notification_service import NotificationService
 
 # Formato CREDELEC: 4 grupos de 4 dígitos separados por hífen
 _CREDELEC_CODE_PATTERN = re.compile(r"^\d{4}-\d{4}-\d{4}-\d{4}$")
@@ -23,9 +24,10 @@ class ApplyManualCodeUseCase:
     - Pertença do contador ao utilizador (RN09)
     """
 
-    def __init__(self, recharge_repo: IRechargeRepository, meter_repo: IMeterRepository):
+    def __init__(self, recharge_repo: IRechargeRepository, meter_repo: IMeterRepository, db=None):
         self.recharge_repo = recharge_repo
         self.meter_repo = meter_repo
+        self.notification_service = NotificationService(db) if db else None
 
     def execute(self, user_id: uuid.UUID, data: ManualCodeRequest) -> ManualCodeResponse:
         # 1. Validar formato do código
@@ -61,6 +63,21 @@ class ApplyManualCodeUseCase:
         # 5. Marcar token como usado e actualizar estado para MQTT_SENT
         now = datetime.now(timezone.utc)
         updated_recharge = self.recharge_repo.mark_token_used(existing_recharge.id, now)
+
+        # 6. Notificar o utilizador
+        if self.notification_service:
+            try:
+                self.notification_service.notify_manual_code_success(
+                    user_id=user_id,
+                    recharge_id=updated_recharge.id,
+                    kwh=updated_recharge.kwh_creditado or 0.0,
+                    meter_number=meter.numero_serie,
+                )
+            except Exception as _e:
+                import logging
+                logging.getLogger(__name__).error(
+                    f"ApplyManualCode: Erro ao criar notificação: {_e}"
+                )
 
         return ManualCodeResponse(
             recharge_id=updated_recharge.id,

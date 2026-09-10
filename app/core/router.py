@@ -15,6 +15,7 @@ from app.modules.payments.presentation.controllers import payment as payment_con
 from app.modules.metrics.presentation.controllers import admin as metrics_admin
 from app.modules.audit.presentation.controllers import admin as audit_admin
 from app.modules.webhooks.presentation.controllers import supabase as webhook_supabase
+from app.modules.notifications.presentation.controllers import notification as notification_controller
 
 api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
 api_router.include_router(user_controller.router, prefix="/users", tags=["users"])
@@ -29,3 +30,5 @@ api_router.include_router(payment_controller.router, prefix="/payments", tags=["
 api_router.include_router(metrics_admin.router, prefix="/admin", tags=["admin"])
 api_router.include_router(audit_admin.router, prefix="/admin", tags=["admin"])
 api_router.include_router(webhook_supabase.router, prefix="/webhooks", tags=["webhooks"])
+api_router.include_router(notification_controller.router, prefix="/notifications", tags=["notifications"])
+
