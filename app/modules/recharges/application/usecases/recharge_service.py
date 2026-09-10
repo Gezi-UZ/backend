@@ -73,15 +73,10 @@ class InitiateRechargeUseCase:
                 detail=f"Valor mínimo de recarga é {MONTANTE_MINIMO_MZN} MZN.",
             )
 
-        # 2. Verificar que o contador pertence ao utilizador (RN09)
+        # 2. Verificar que o contador existe
         meter = self.meter_repo.get_by_id(data.meter_id)
         if not meter:
             raise HTTPException(status_code=404, detail="Contador não encontrado.")
-        if meter.utilizador_id != user_id:
-            raise HTTPException(
-                status_code=403,
-                detail="Contador não pertence ao utilizador autenticado.",
-            )
 
         # 3. Verificar se é a primeira compra do mês para este contador (RN — taxas fixas mensais)
         is_primeira_compra_mes = not self.recharge_repo.has_successful_recharge_this_month(
@@ -220,9 +215,8 @@ class GetRechargeStatusUseCase:
         if not recharge:
             raise HTTPException(status_code=404, detail="Recarga não encontrada.")
 
-        # Verificar que o contador da recarga pertence ao utilizador
-        meter = self.meter_repo.get_by_id(recharge.contador_id)
-        if not meter or meter.utilizador_id != user_id:
+        # Verificar que a recarga pertence ao utilizador
+        if recharge.utilizador_id != user_id:
             raise HTTPException(status_code=403, detail="Acesso negado.")
 
         return RechargeStatusResponse(
@@ -328,12 +322,10 @@ class CalculateRechargeBreakdownUseCase:
         self.meter_repo = meter_repo
 
     def execute(self, user_id: uuid.UUID, meter_id: uuid.UUID, amount_mzn: float) -> RechargeBreakdownResponse:
-        # 1. Verificar que o contador pertence ao utilizador
+        # 1. Verificar que o contador existe
         meter = self.meter_repo.get_by_id(meter_id)
         if not meter:
             raise HTTPException(status_code=404, detail="Contador não encontrado.")
-        if meter.utilizador_id != user_id:
-            raise HTTPException(status_code=403, detail="Contador não pertence ao utilizador.")
 
         # 2. Verificar se é primeira compra do mês
         is_primeira_compra_mes = not self.recharge_repo.has_successful_recharge_this_month(meter_id=meter_id)
