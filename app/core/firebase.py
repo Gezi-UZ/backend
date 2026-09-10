@@ -17,18 +17,21 @@ def init_firebase():
         firebase_admin.get_app()
     except ValueError:
         try:
-            raw_val = settings.firebase_service_account.strip()
-            # Handle string double-quoting or escaping from environment variables
-            if raw_val.startswith('"') and raw_val.endswith('"'):
-                try:
-                    raw_val = json.loads(raw_val)
-                except Exception:
-                    raw_val = raw_val[1:-1]
+            val = settings.firebase_service_account.strip()
+            
+            # Extract JSON object bounds if surrounded by extra characters or quotes
+            first_brace = val.find("{")
+            last_brace = val.rfind("}")
+            if first_brace != -1 and last_brace != -1 and last_brace > first_brace:
+                val = val[first_brace:last_brace+1]
 
-            if isinstance(raw_val, str):
-                service_account_info = json.loads(raw_val)
-            else:
-                service_account_info = raw_val
+            val = val.replace("\\\"", "\"")
+
+            try:
+                service_account_info = json.loads(val, strict=False)
+            except Exception:
+                # Fallback if already dict or standard json
+                service_account_info = json.loads(settings.firebase_service_account)
 
             if isinstance(service_account_info, dict) and "private_key" in service_account_info:
                 pk = service_account_info["private_key"]

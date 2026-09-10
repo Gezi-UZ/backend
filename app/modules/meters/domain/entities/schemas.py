@@ -33,6 +33,8 @@ class MeterResponse(BaseModel):
     credit_kwh: float = Field(alias="kwh_saldo")
     relay_state: bool = Field(alias="estado_rele")
     last_recharge_at: Optional[datetime] = Field(alias="ultima_recarga")
+    last_seen_at: Optional[datetime] = Field(alias="ultima_sincronizacao")
+    is_online: bool = False
     canal: int = 0
     is_primary: bool = Field(alias="is_primary", default=False)
 
@@ -49,6 +51,15 @@ class MeterResponse(BaseModel):
                 longitude=obj.longitude,
                 address=obj.address
             )
+        # Compute dynamic is_online based on ultima_sincronizacao (threshold: 5 minutes)
+        from datetime import timezone, timedelta
+        sync_time = getattr(obj, "ultima_sincronizacao", None)
+        if sync_time:
+            if sync_time.tzinfo is None:
+                sync_time = sync_time.replace(tzinfo=timezone.utc)
+            obj.is_online = (datetime.now(timezone.utc) - sync_time) <= timedelta(minutes=5)
+        else:
+            obj.is_online = False
         return super().model_validate(obj, *args, **kwargs)
 
 class MeterStatusResponse(BaseModel):
@@ -67,4 +78,3 @@ class AdminMeterDetailResponse(MeterResponse):
     owner_phone: Optional[str] = None
     device_mac: Optional[str] = None
     firmware_version: Optional[str] = None
-    last_seen_at: Optional[datetime] = None
