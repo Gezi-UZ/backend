@@ -13,6 +13,7 @@ from app.modules.meters.application.usecases.admin_update_meter import AdminUpda
 from app.modules.meters.application.usecases.admin_create_meter import AdminCreateMeterUseCase
 from app.modules.audit.presentation.dependencies import get_create_audit_log_usecase
 from app.modules.audit.application.usecases.create_audit_log import CreateAuditLogUseCase
+from app.modules.meters.application.usecases.lookup_meter import LookupMeterUseCase
 
 def get_meter_repository(db: Session = Depends(get_db)):
     return SQLAlchemyMeterRepository(db)
@@ -25,6 +26,9 @@ def get_list_my_meters_usecase(repo: SQLAlchemyMeterRepository = Depends(get_met
 
 def get_get_meter_usecase(repo: SQLAlchemyMeterRepository = Depends(get_meter_repository)):
     return GetMeterUseCase(repo)
+
+def get_lookup_meter_usecase(repo: SQLAlchemyMeterRepository = Depends(get_meter_repository)):
+    return LookupMeterUseCase(repo)
 
 def get_update_meter_usecase(repo: SQLAlchemyMeterRepository = Depends(get_meter_repository)):
     return UpdateMeterUseCase(repo)

@@ -8,12 +8,14 @@ from app.modules.meters.presentation.dependencies import (
     get_register_meter_usecase,
     get_list_my_meters_usecase,
     get_get_meter_usecase,
+    get_lookup_meter_usecase,
     get_update_meter_usecase,
     get_get_meter_status_usecase
 )
 from app.modules.meters.application.usecases.register_meter import RegisterMeterUseCase
 from app.modules.meters.application.usecases.list_my_meters import ListMyMetersUseCase
 from app.modules.meters.application.usecases.get_meter import GetMeterUseCase
+from app.modules.meters.application.usecases.lookup_meter import LookupMeterUseCase
 from app.modules.meters.application.usecases.update_meter import UpdateMeterUseCase
 from app.modules.meters.application.usecases.get_meter_status import GetMeterStatusUseCase
 
@@ -45,6 +47,18 @@ def register_meter(
             "meter_id": str(meter.id),
             "status": meter.estado
         }
+    }
+
+@router.get("/lookup")
+def lookup_meter(
+    serial_number: str,
+    current_user: AuthUser = Depends(get_current_user),
+    usecase: LookupMeterUseCase = Depends(get_lookup_meter_usecase)
+) -> Dict[str, Any]:
+    meter = usecase.execute(serial_number)
+    return {
+        "success": True,
+        "data": MeterResponse.model_validate(meter).model_dump(by_alias=True)
     }
 
 @router.get("/{meter_id}")
