@@ -288,6 +288,7 @@ class GetRechargeHistoryUseCase:
                     referencia_mpesa=referencia,
                     recharge_type=recharge_type,
                     other_party_name=other_party_name,
+                    token_sts=r.token_sts,
                 )
             )
 

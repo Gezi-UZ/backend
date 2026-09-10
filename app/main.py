@@ -8,6 +8,7 @@ from app.core.config import settings
 from app.core.mqtt import start_mqtt, stop_mqtt
 from app.core.router import api_router
 from app.core.reconciliation import reconciliation_task
+from app.core.firebase import init_firebase
 import app.core.base  # Import all models for SQLAlchemy registry
 
 logging.basicConfig(level=logging.INFO)
@@ -17,6 +18,7 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 async def lifespan(app: FastAPI):
     # Startup
     start_mqtt()
+    init_firebase()
     task = asyncio.create_task(reconciliation_task())
     yield
     # Shutdown

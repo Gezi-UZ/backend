@@ -14,6 +14,7 @@ from app.modules.iot.presentation.controllers import iot as iot_controller, admi
 from app.modules.payments.presentation.controllers import payment as payment_controller
 from app.modules.metrics.presentation.controllers import admin as metrics_admin
 from app.modules.audit.presentation.controllers import admin as audit_admin
+from app.modules.webhooks.presentation.controllers import supabase as webhook_supabase
 
 api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
 api_router.include_router(user_controller.router, prefix="/users", tags=["users"])
@@ -27,5 +28,4 @@ api_router.include_router(iot_admin.router, prefix="/admin", tags=["admin"])
 api_router.include_router(payment_controller.router, prefix="/payments", tags=["payments"])
 api_router.include_router(metrics_admin.router, prefix="/admin", tags=["admin"])
 api_router.include_router(audit_admin.router, prefix="/admin", tags=["admin"])
-
-
+api_router.include_router(webhook_supabase.router, prefix="/webhooks", tags=["webhooks"])

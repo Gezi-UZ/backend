@@ -26,6 +26,9 @@ class Settings(BaseSettings):
     e2payments_client_secret: str = ""
     e2payments_wallet_id: str = ""
 
+    # Firebase
+    firebase_service_account: str = ""
+
     # Auth
     jwt_secret_key: str = ""
     jwt_algorithm: str = "HS256"

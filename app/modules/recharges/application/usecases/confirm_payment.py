@@ -176,6 +176,8 @@ class ConfirmPaymentUseCase:
                 "recharge_id": str(recarga.id),
                 "status": "MQTT_SENT",
                 "kwh": desdobramento["kwh_calculado"],
+                "credit_kwh": desdobramento["kwh_calculado"],
+                "amount_mzn": recarga.montante_pago,
                 "command_id": str(comando.id),
                 "token": recarga.token_sts,
             }

@@ -66,6 +66,7 @@ class RechargeHistoryItem(BaseModel):
     referencia_mpesa: Optional[str] = None
     recharge_type: str = "SELF"  # SELF, FOR_OTHER, RECEIVED
     other_party_name: Optional[str] = None
+    token_sts: Optional[str] = None
 
     class Config:
         from_attributes = True
