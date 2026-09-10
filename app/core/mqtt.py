@@ -198,6 +198,26 @@ def _handle_hello(mac_address: str, payload: dict):
                     config_topic = f"gezi/v1/{mac_address}/config"
                     mqtt_client.publish(config_topic, json.dumps(config_payload), qos=1)
                     logger.info(f"MQTT: Configuração de seriais reenviada no boot para {mac_address}: {config_payload}")
+
+                # Sincronização de saldo no boot: envia SET_BALANCE para cada canal
+                # Garante que o ESP32 usa o saldo do Supabase (fonte da verdade),
+                # evitando divergências após recargas STS aplicadas enquanto offline.
+                for contador in contadores:
+                    serial = contador.numero_serie
+                    kwh_saldo = float(contador.kwh_saldo or 0.0)
+                    import uuid as _uuid
+                    command_id = str(_uuid.uuid4())
+                    cmd_topic = f"credelec/meter/{serial}/cmd"
+                    cmd_payload = json.dumps({
+                        "command": "SET_BALANCE",
+                        "kwh": round(kwh_saldo, 2),
+                        "command_id": command_id,
+                    })
+                    mqtt_client.publish(cmd_topic, cmd_payload, qos=1)
+                    logger.info(
+                        f"MQTT: SET_BALANCE enviado no boot para {serial} "
+                        f"(canal={contador.canal}, kwh={kwh_saldo:.2f}, cmd_id={command_id})"
+                    )
             finally:
                 db.close()
         except Exception as e:
