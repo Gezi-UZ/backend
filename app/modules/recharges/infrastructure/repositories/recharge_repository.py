@@ -208,7 +208,7 @@ class SQLAlchemyRechargeRepository(IRechargeRepository):
         if db_recharge:
             db_recharge.token_sts_usado = True
             db_recharge.recarregado_em = applied_at
-            db_recharge.estado = "MQTT_SENT"
+            db_recharge.estado = "CONCLUIDA"
             self.db.commit()
             self.db.refresh(db_recharge)
         return db_recharge
