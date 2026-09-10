@@ -209,6 +209,11 @@ class SQLAlchemyRechargeRepository(IRechargeRepository):
             db_recharge.token_sts_usado = True
             db_recharge.recarregado_em = applied_at
             db_recharge.estado = "CONCLUIDA"
+            
+            if db_recharge.contador:
+                db_recharge.contador.kwh_saldo = (db_recharge.contador.kwh_saldo or 0) + (db_recharge.kwh_creditado or 0)
+                db_recharge.contador.ultima_recarga = applied_at
+                
             self.db.commit()
             self.db.refresh(db_recharge)
         return db_recharge
