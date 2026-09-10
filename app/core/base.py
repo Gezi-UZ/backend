@@ -10,6 +10,7 @@ from app.modules.recharges.domain.entities.recharge import Recarga
 from app.modules.recharges.domain.entities.recharge_breakdown import DesdobramentoRecarga
 from app.modules.payments.domain.entities.payment import Pagamento
 from app.modules.audit.domain.entities.audit import LogAuditoria
+from app.modules.notifications.domain.entities.notification import NotificacaoUtilizador, PreferenciasNotificacao
 from sqlalchemy import Table, Column, String
 from sqlalchemy.dialects.postgresql import UUID
 

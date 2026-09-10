@@ -15,6 +15,7 @@ from app.modules.payments.presentation.controllers import payment as payment_con
 from app.modules.metrics.presentation.controllers import admin as metrics_admin
 from app.modules.audit.presentation.controllers import admin as audit_admin
 from app.modules.webhooks.presentation.controllers import supabase as webhook_supabase
+# pyrefly: ignore [missing-import]
 from app.modules.notifications.presentation.controllers import notification as notification_controller
 
 api_router.include_router(auth.router, prefix="/auth", tags=["auth"])

@@ -18,11 +18,15 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 
 from app.core.database import get_db
-from app.core.security import get_current_user_id
+from app.modules.auth.presentation.dependencies import get_current_user
+from app.modules.auth.domain.entities.auth import AuthUser
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+def get_current_user_id(user: AuthUser = Depends(get_current_user)) -> uuid.UUID:
+    return user.id
 
 
 # ── Schemas ──────────────────────────────────────────────────────────────────
