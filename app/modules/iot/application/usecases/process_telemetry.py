@@ -75,11 +75,50 @@ class ProcessTelemetryUseCase:
             contador.dispositivo.ultimo_heartbeat = datetime.utcnow()
 
         # Verificar se saldo esta abaixo do limiar
-        if contador.kwh_saldo is not None and contador.kwh_saldo < LIMIAR_SALDO_BAIXO_KWH:
-            self._criar_alerta_saldo_baixo(contador)
+        if contador.kwh_saldo is not None:
+            if contador.kwh_saldo <= 0.0:
+                self._criar_alerta_saldo_esgotado(contador)
+            elif contador.kwh_saldo < LIMIAR_SALDO_BAIXO_KWH:
+                self._criar_alerta_saldo_baixo(contador)
 
         self.db.commit()
         logger.info(f"Telemetria: Contador '{serial}' atualizado (kWh={contador.kwh_saldo}, rele={contador.estado_rele})")
+
+    def _criar_alerta_saldo_esgotado(self, contador: Contador):
+        """Cria um alerta de saldo esgotado (energia cortada) se nao existir um recente."""
+        from datetime import timedelta
+        
+        alerta_recente = (
+            self.db.query(Alerta)
+            .filter(
+                Alerta.contador_id == contador.id,
+                Alerta.tipo == "SALDO_ESGOTADO",
+                Alerta.criado_em >= datetime.utcnow() - timedelta(hours=24),
+            )
+            .first()
+        )
+
+        if alerta_recente:
+            return
+
+        alerta = Alerta(
+            id=uuid.uuid4(),
+            tipo="SALDO_ESGOTADO",
+            mensagem=f"O saldo do contador {contador.numero_serie} esgotou.",
+            utilizador_id=contador.utilizador_id,
+            contador_id=contador.id,
+        )
+        self.db.add(alerta)
+        
+        from app.modules.notifications.application.notification_service import NotificationService
+        ns = NotificationService(self.db)
+        ns.notify_out_of_balance(
+            user_id=contador.utilizador_id,
+            meter_id=contador.id,
+            meter_number=contador.numero_serie,
+        )
+        
+        logger.info(f"Telemetria: Alerta SALDO_ESGOTADO criado e notificacao enviada para contador '{contador.numero_serie}'")
 
     def _criar_alerta_saldo_baixo(self, contador: Contador):
         """Cria um alerta de saldo baixo se nao existir um recente (ultimas 24h)."""
