@@ -107,4 +107,15 @@ class ProcessTelemetryUseCase:
             contador_id=contador.id,
         )
         self.db.add(alerta)
-        logger.info(f"Telemetria: Alerta SALDO_BAIXO criado para contador '{contador.numero_serie}'")
+        
+        # Enviar notificacao push/in-app usando NotificationService
+        from app.modules.notifications.application.notification_service import NotificationService
+        ns = NotificationService(self.db)
+        ns.notify_low_balance(
+            user_id=contador.utilizador_id,
+            meter_id=contador.id,
+            meter_number=contador.numero_serie,
+            kwh_remaining=contador.kwh_saldo,
+        )
+        
+        logger.info(f"Telemetria: Alerta SALDO_BAIXO criado e notificacao enviada para contador '{contador.numero_serie}'")
