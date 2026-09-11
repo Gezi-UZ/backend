@@ -101,6 +101,8 @@ class ProcessAckUseCase:
                         "status": "CONCLUIDA",
                         "token": recarga.token_sts,
                         "kwh_applied": kwh_applied,
+                        "credit_kwh": kwh_applied,
+                        "amount_mzn": float(recarga.montante_pago) if recarga.montante_pago else 0.0,
                         "applied_at": datetime.utcnow().isoformat() + "Z",
                     }
                 })
