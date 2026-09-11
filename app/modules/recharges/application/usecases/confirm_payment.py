@@ -129,6 +129,19 @@ class ConfirmPaymentUseCase:
                 logger.error(f"ConfirmPayment: Erro ao criar notificação (no device): {_e}")
             self.db.commit()
             logger.warning(f"ConfirmPayment: Contador sem dispositivo IoT associado")
+            
+            self._emit_sse_event(str(recarga.id), {
+                "event": "status_update",
+                "data": {
+                    "recharge_id": str(recarga.id),
+                    "status": "CONFIRMED_NO_DEVICE",
+                    "amount_mzn": recarga.montante_pago,
+                    "kwh": recarga.kwh_creditado or 0.0,
+                    "credit_kwh": recarga.kwh_creditado or 0.0,
+                    "token": recarga.token_sts,
+                }
+            })
+
             return {
                 "success": True,
                 "status": "CONFIRMED_NO_DEVICE",
