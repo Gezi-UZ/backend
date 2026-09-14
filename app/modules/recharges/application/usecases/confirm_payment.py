@@ -83,6 +83,22 @@ class ConfirmPaymentUseCase:
         recarga.estado = "CONFIRMED"
         recarga.pagamento_id = pagamento.id
 
+        # Fix: Emitir evento SSE de CONFIRMED imediatamente após confirmar o pagamento.
+        # Garante que o mobile sabe que o M-Pesa foi aceite mesmo que a stream
+        # SSE caia antes de chegarmos ao MQTT_SENT.
+        self.db.flush()  # Persiste o CONFIRMED sem commit final ainda
+        self._emit_sse_event(str(recarga.id), {
+            "event": "status_update",
+            "data": {
+                "recharge_id": str(recarga.id),
+                "status": "CONFIRMED",
+                "amount_mzn": recarga.montante_pago,
+                "credit_kwh": recarga.kwh_creditado or 0.0,
+                "kwh": recarga.kwh_creditado or 0.0,
+                "token_sts": recarga.token_sts,
+            }
+        })
+
         # Gravar desdobramento se nao existir
         if not recarga.desdobramento:
             breakdown = DesdobramentoRecarga(
