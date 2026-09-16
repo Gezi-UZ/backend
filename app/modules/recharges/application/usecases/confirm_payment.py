@@ -73,11 +73,33 @@ class ConfirmPaymentUseCase:
             self.db.commit()
             return {"success": False, "error": "Recarga associada nao encontrada"}
 
-        # 4. Calcular desdobramento tarifario
-        desdobramento = calcular_desdobramento(
-            montante_total=recarga.montante_pago,
-            is_primeira_compra_mes=recarga.is_primeira_compra_mes,
+        # 4. Encontrar o contador e o dispositivo IoT
+        contador = (
+            self.db.query(Contador)
+            .filter(Contador.id == recarga.contador_id)
+            .first()
         )
+
+        # 5. Calcular ou utilizar desdobramento tarifário existente (com amortização de dívida)
+        divida_pendente = contador.divida_pendente if contador else 0.0
+        if recarga.desdobramento:
+            d = recarga.desdobramento
+            desdobramento = {
+                "montante_total": float(d.montante_total),
+                "val_energia": float(d.val_energia),
+                "iva": float(d.iva),
+                "divida_paga": float(d.divida_paga),
+                "tx_radio": float(d.tx_radio),
+                "tx_lixo": float(d.tx_lixo),
+                "kwh_calculado": float(d.kwh_calculado),
+                "nova_divida": 0.0,
+            }
+        else:
+            desdobramento = calcular_desdobramento(
+                montante_total=recarga.montante_pago,
+                divida_pendente=divida_pendente,
+                is_primeira_compra_mes=recarga.is_primeira_compra_mes,
+            )
 
         recarga.kwh_creditado = desdobramento["kwh_calculado"]
         recarga.estado = "CONFIRMED"
@@ -113,13 +135,6 @@ class ConfirmPaymentUseCase:
                 kwh_calculado=desdobramento["kwh_calculado"],
             )
             self.db.add(breakdown)
-
-        # 5. Encontrar o contador e o dispositivo IoT
-        contador = (
-            self.db.query(Contador)
-            .filter(Contador.id == recarga.contador_id)
-            .first()
-        )
 
         # Atualizar divida pendente no contador
         if contador:

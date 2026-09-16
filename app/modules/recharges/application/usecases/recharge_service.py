@@ -6,6 +6,7 @@ GetRechargeStatusUseCase  — RF03: Consulta estado actual de uma recarga (one-s
 GetRechargeHistoryUseCase — RF06: Histórico paginado de recargas.
 GetRechargeDashboardUseCase — RF14: Estatísticas agregadas.
 """
+from typing import Union
 import uuid
 import asyncio
 import logging
@@ -321,14 +322,25 @@ class CalculateRechargeBreakdownUseCase:
         self.recharge_repo = recharge_repo
         self.meter_repo = meter_repo
 
-    def execute(self, user_id: uuid.UUID, meter_id: uuid.UUID, amount_mzn: float) -> RechargeBreakdownResponse:
-        # 1. Verificar que o contador existe
-        meter = self.meter_repo.get_by_id(meter_id)
+    def execute(self, user_id: uuid.UUID, meter_id: Union[uuid.UUID, str], amount_mzn: float) -> RechargeBreakdownResponse:
+        # 1. Resolver contador por UUID ou Número de Série
+        meter = None
+        if isinstance(meter_id, uuid.UUID):
+            meter = self.meter_repo.get_by_id(meter_id)
+        else:
+            try:
+                meter_uuid = uuid.UUID(str(meter_id))
+                meter = self.meter_repo.get_by_id(meter_uuid)
+            except (ValueError, TypeError):
+                pass
+            if not meter:
+                meter = self.meter_repo.get_by_serial_number(str(meter_id))
+
         if not meter:
             raise HTTPException(status_code=404, detail="Contador não encontrado.")
 
-        # 2. Verificar se é primeira compra do mês
-        is_primeira_compra_mes = not self.recharge_repo.has_successful_recharge_this_month(meter_id=meter_id)
+        # 2. Verificar se é primeira compra do mês usando o ID real do contador
+        is_primeira_compra_mes = not self.recharge_repo.has_successful_recharge_this_month(meter_id=meter.id)
 
         # 3. Calcular
         try:
@@ -337,6 +349,9 @@ class CalculateRechargeBreakdownUseCase:
                 divida_pendente=meter.divida_pendente,
                 is_primeira_compra_mes=is_primeira_compra_mes,
             )
-            return RechargeBreakdownResponse(**breakdown)
+            return RechargeBreakdownResponse(
+                **breakdown,
+                is_primeira_compra_mes=is_primeira_compra_mes,
+            )
         except ValueError as e:
             raise HTTPException(status_code=422, detail=str(e))

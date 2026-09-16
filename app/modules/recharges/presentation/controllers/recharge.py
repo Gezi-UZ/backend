@@ -94,7 +94,7 @@ async def initiate_recharge(
 
 @router.get("/calculate")
 def calculate_recharge(
-    meter_id: uuid.UUID = Query(..., description="ID do contador"),
+    meter_id: str = Query(..., description="ID ou Número de série do contador"),
     amount_mzn: float = Query(..., description="Montante em MZN"),
     current_user: AuthUser = Depends(get_current_user),
     usecase: CalculateRechargeBreakdownUseCase = Depends(get_calculate_recharge_breakdown_usecase),

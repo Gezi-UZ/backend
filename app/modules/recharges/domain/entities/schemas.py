@@ -35,6 +35,7 @@ class RechargeBreakdownResponse(BaseModel):
     tx_lixo: float
     kwh_calculado: float
     nova_divida: float = 0.0
+    is_primeira_compra_mes: bool = False
 
 
 class RechargeInitiateResponse(BaseModel):
